@@ -1,6 +1,11 @@
-class Board {
+import {Tile} from './tile.js';
+
+export class Board {
   constructor() {
-    this.grid = Array(9).fill(null).map(() => Array(9).fill(null)); // 9x9 grid
+    this.grid = Array.from({ length: 9 }, () =>
+  Array.from({ length: 9 }, () => new Tile())
+);
+    this.river = { position: { x: 5, y: 5 }, turns: 0, player: null };
   }
 
   placeCard(x, y, card, playerId) {
@@ -11,7 +16,7 @@ class Board {
     return false;
   }
 
-  moveUnit(fromX, fromY, toX, toY, playerId) {
+  moveUnit(fromX, fromY, toX, toY, playerId, unit) {
     const unit = this.grid[fromX][fromY];
     if (unit && unit.playerId === playerId && this.isValidMove(toX, toY)) {
       this.grid[toX][toY] = unit;
@@ -30,6 +35,14 @@ class Board {
     // Add logic to check if move is valid
     return x >= 0 && x < 9 && y >= 0 && y < 9 && this.grid[x][y] === null;
   }
-}
 
-module.exports = Board;
+  updateRiver() {
+    currentRiverOwner =this.grid[this.river.position.x][this.river.position.y]
+    if (){
+      if
+    }
+  }
+  checkRiverWin() {
+    return this.river.turns == 5;
+  }
+}
