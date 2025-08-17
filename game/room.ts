@@ -34,6 +34,7 @@ class Room {
   }
 
   startTurn(io: IOServer) {
+    
     const currentPlayer = this.players[this.activeIndex].id;
 
     io.to(currentPlayerId).emit("yourTurn", {
