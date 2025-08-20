@@ -1,13 +1,19 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cookieParser = require('cookie-parser');
-const Board = require('./game/board');
-const Player = require('./game/player');
-const Deck = require('./game/deck');
-const winston = require('winston');
+import dotenv from 'dotenv';
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import cookieParser from 'cookie-parser';
+import winston from 'winston';
 
+import { Board } from './game/board.js';
+import { Player } from './game/player.js';
+import { Deck } from './game/deck.js';
+import { Card } from './game/card.js';
+
+// Load environment variables
+dotenv.config();
+
+// Set up logger
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: winston.format.combine(
@@ -20,27 +26,36 @@ const logger = winston.createLogger({
   ],
 });
 
+// Initialize Express app
 const app = express();
 app.set('trust proxy', 1);
 
+// Create HTTP server
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Middleware
 app.use(express.json());
 app.use(express.static('public'));
 
-// --- Game logic only below ---
+// --- Game logic ---
 
+// Initialize board, players, and deck
 const board = new Board();
-const players = {}; // Store players by their socket ID
+const players: Record<string, Player> = {}; // Store players by their socket ID
 const deck = new Deck();
 deck.shuffle();
 
 let currentTurn = 0; // Index of the current player's turn
-const turnOrder = []; // Array to maintain the turn order
+const turnOrder: string[] = []; // Array to maintain the turn order
+
+// Error handling middleware
+app.use((req, res, next) => {
+  res.status(404).sendFile('index.html', { root: 'public' });
+});
 
 io.on('connection', (socket) => {
-  logger.info('A user connected:', socket.id);
+  logger.info(`A user connected: ${socket.id}`);
 
   // Initialize player
   players[socket.id] = new Player(socket.id, `Player-${socket.id}`);
@@ -48,11 +63,29 @@ io.on('connection', (socket) => {
   // Add player to turn order
   turnOrder.push(socket.id);
 
-  // Emit turn information to all players
+  // Send initial hand
+  const initialCards = deck.deal(5);
+  players[socket.id].hand = initialCards;
+  socket.emit('updateHand', initialCards);
+  
+  // Send current board state
+  socket.emit('updateBoard', board.grid);
+
+// Emit turn information to all players
   const emitTurnInfo = () => {
     io.emit('turnInfo', {
       currentPlayer: turnOrder[currentTurn],
       turnOrder,
+      players: Object.fromEntries(
+        Object.entries(players).map(([id, player]) => [
+          id,
+          {
+            name: player.name,
+            coins: player.coins,
+            handSize: player.hand.length
+          }
+        ])
+      )
     });
   };
 
@@ -67,8 +100,8 @@ io.on('connection', (socket) => {
   });
 
   // Handle tile click to show state and combat options
-  socket.on('clickTile', ({ x, y }) => {
-    const tile = board.grid[x][y];
+  socket.on('clickTile', ({ x, y }: { x: number, y: number }) => {
+    const tile = board.grid[x]?.[y];
     if (tile) {
       const combatants = turnOrder.map((playerId) => {
         const player = players[playerId];
@@ -83,11 +116,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('placeCard', ({ x, y, cardIndex }) => {
+  socket.on('placeCard', ({ x, y, cardIndex }: { x: number, y: number, cardIndex: number }) => {
     if (socket.id === turnOrder[currentTurn]) {
       const player = players[socket.id];
       const card = player.hand[cardIndex];
-      if (board.placeCard(x, y, card, player.id)) {
+      if (card && board.placeCard(x, y, card, player.id as string)) {
         player.hand.splice(cardIndex, 1); // Remove card from hand
         io.emit('updateBoard', board.grid);
       } else {
@@ -98,10 +131,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('moveUnit', ({ fromX, fromY, toX, toY }) => {
+  socket.on('moveUnit', ({ fromX, fromY, toX, toY }: { fromX: number, fromY: number, toX: number, toY: number }) => {
     if (socket.id === turnOrder[currentTurn]) {
       const player = players[socket.id];
-      if (board.moveUnit(fromX, fromY, toX, toY, player.id)) {
+      if (board.moveUnit(fromX, fromY, toX, toY, player.id as string)) {
         io.emit('updateBoard', board.grid);
       } else {
         socket.emit('error', 'Invalid move');
@@ -126,7 +159,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    logger.info('A user disconnected:', socket.id);
+    logger.info(`A user disconnected: ${socket.id}`);
     delete players[socket.id];
 
     // Remove player from turn order

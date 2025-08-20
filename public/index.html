@@ -2,14 +2,84 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=600, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Safe As Houses - Board Game</title>
   <style>
-    body { margin: 0; padding: 0; background: #222; }
-    canvas { display: block; margin: 0 auto; }
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: #222; 
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+    canvas { 
+      display: block; 
+      margin: 0 auto; 
+      border: 1px solid #444;
+    }
+    .container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #4CAF50;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 10px;
+      background: #333;
+      border-radius: 5px;
+    }
+    .player-info {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 20px;
+    }
+    .player {
+      padding: 10px;
+      background: #333;
+      border-radius: 5px;
+      min-width: 120px;
+    }
+    .current-player {
+      border: 2px solid #4CAF50;
+    }
+    .actions {
+      margin: 20px 0;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h1>Safe As Houses</h1>
+    <div class="status" id="status">Waiting for players...</div>
+    <div class="player-info" id="players"></div>
+    <div id="game-container"></div>
+    <div class="actions">
+      <button id="end-turn">End Turn</button>
+      <button id="buy-card">Buy Card (2 coins)</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="game.js"></script>
 </body>
 </html>
