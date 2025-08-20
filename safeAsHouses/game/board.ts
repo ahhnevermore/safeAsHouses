@@ -20,24 +20,19 @@ export class Board {
 
   placeCard(x: number, y: number, card: Card, playerId: string): boolean {
     if (this.isValidPlacement(x, y, playerId)) {
-      const tile = this.grid[x]?.[y];
-      if (tile) {
-        tile.placeCard(card, playerId, 0);
-        return true;
-      }
+      this.grid[x][y].placeCard(card, playerId, 0);
+      return true;
     }
     return false;
   }
 
   moveUnit(fromX: number, fromY: number, toX: number, toY: number, playerId: string): boolean {
-    const fromTile = this.grid[fromX]?.[fromY];
-    if (fromTile && fromTile.owner === playerId && this.isValidMove(toX, toY)) {
-      const toTilePos = this.grid[toX]?.[toY];
-      if (toTilePos) {
-        this.grid[toX][toY] = fromTile;
-        this.grid[fromX][fromY] = new Tile();
-        return true;
-      }
+    const tile = this.grid[fromX][fromY];
+    if (tile && tile.owner === playerId && this.isValidMove(toX, toY)) {
+      // Implement move logic
+      this.grid[toX][toY] = tile;
+      this.grid[fromX][fromY] = new Tile();
+      return true;
     }
     return false;
   }
@@ -53,18 +48,13 @@ export class Board {
   }
 
   updateRiver(): void {
-    const riverX = this.river.position.x;
-    const riverY = this.river.position.y;
-    
-    if (riverX >= 0 && riverX < 9 && riverY >= 0 && riverY < 9) {
-      const currentRiverOwner = this.grid[riverX]?.[riverY]?.owner;
-      if (currentRiverOwner) {
-        if (this.river.player === currentRiverOwner) {
-          this.river.turns++;
-        } else {
-          this.river.player = currentRiverOwner;
-          this.river.turns = 1;
-        }
+    const currentRiverOwner = this.grid[this.river.position.x][this.river.position.y].owner;
+    if (currentRiverOwner) {
+      if (this.river.player === currentRiverOwner) {
+        this.river.turns++;
+      } else {
+        this.river.player = currentRiverOwner;
+        this.river.turns = 1;
       }
     }
   }
