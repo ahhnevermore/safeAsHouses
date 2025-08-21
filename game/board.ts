@@ -1,51 +1,122 @@
-import { Tile } from './tile.js';
+import type { Unit } from "./unit.js";
+import { Tile } from "./tile.js";
+import { Base, ModScope, Rank, River, Vec2 } from "./util.js";
 
-
+const boardSize: number = 9;
 export class Board {
-  grid: Tile[][] = [];
-  river:
-    constructor() {
-  this.grid = Array.from({ length: 9 }, () =>
-    Array.from({ length: 9 }, () => new Tile())
+  grid: Tile[][] = Array.from({ length: boardSize }, () =>
+    Array.from({ length: boardSize }, () => new Tile())
   );
-  this.river = { position: { x: 5, y: 5 }, turns: 0, player: null };
-}
+  rivers: Vec2[] = [new Vec2(4, 4)];
+  bases: Vec2[] = [
+    new Vec2(0, 0),
+    new Vec2(0, 8),
+    new Vec2(8, 0),
+    new Vec2(8, 8),
+  ];
 
-placeCard(x, y, card, playerId) {
-  if (this.isValidPlacement(x, y, playerId)) {
-    this.grid[x][y] = { card, playerId, faceUp: false };
-    return true;
+  constructor() {
+    this.rivers.forEach((elem) =>
+      this.getTile(elem.x, elem.y)?.addStructure(new River())
+    );
+
+    this.bases.forEach((base) =>
+      this.getTile(base.x, base.y)?.addStructure(new Base())
+    );
   }
-  return false;
-}
 
-moveUnit(fromX, fromY, toX, toY, playerId, unit) {
-  const unit = this.grid[fromX][fromY];
-  if (unit && unit.playerId === playerId && this.isValidMove(toX, toY)) {
-    this.grid[toX][toY] = unit;
-    this.grid[fromX][fromY] = null;
-    return true;
+  getTile(x: number, y: number): Tile | undefined {
+    const tile = this.grid[x]?.[y];
+    return tile;
   }
-  return false;
-}
 
-isValidPlacement(x, y, playerId) {
-  // Add logic to check if placement is valid (e.g., adjacent to conquered territory)
-  return this.grid[x][y] === null;
-}
-
-isValidMove(x, y) {
-  // Add logic to check if move is valid
-  return x >= 0 && x < 9 && y >= 0 && y < 9 && this.grid[x][y] === null;
-}
-
-updateRiver() {
-  currentRiverOwner = this.grid[this.river.position.x][this.river.position.y]
-  if () {
-    if
+  placeCard(xy: Vec2, unit: Unit, playerID: string, bet: number): boolean {
+    if (this.isValidPlacement(xy.x, xy.y, playerID)) {
+      const tile = this.getTile(xy.x, xy.y)!;
+      return tile.placeUnit(unit, playerID, bet);
     }
-}
-checkRiverWin() {
-  return this.river.turns == 5;
-}
+    return false;
+  }
+
+  moveUnit(orig: Vec2, dest: Vec2, playerID: string, unitID: number) {
+    const origTile = this.getTile(orig.x, orig.y);
+    if (origTile) {
+      const unit = origTile.getUnit(playerID, unitID);
+      if (unit && this.isValidMove(playerID, unit, orig, dest)) {
+        origTile.removeUnit(playerID, unitID);
+        this.getTile(dest.x, dest.y)?.addUnit(playerID, unit);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  isValidPlacement(x: number, y: number, playerID: string): boolean {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const tile = this.grid[x + dx]?.[y + dy];
+        if (tile && tile.owner == playerID) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  isValidMove(playerID: string, unit: Unit, orig: Vec2, dest: Vec2): boolean {
+    if (
+      dest.x >= 0 &&
+      dest.x < boardSize &&
+      dest.y >= 0 &&
+      dest.y < boardSize
+    ) {
+      var isValid = false;
+      isValid = orig.isWithinSquare(dest, 1);
+      const moveMods = unit.getMod(ModScope.Move);
+      if (moveMods.length > 0) {
+        moveMods.forEach((card) => {
+          if (card.rank == Rank.King) {
+            return false;
+          }
+          if (card.rank == Rank.Ace) {
+            isValid = orig.isWithinSquare(dest, 2);
+          }
+        });
+      }
+      return isValid;
+    }
+    return false;
+  }
+
+  updateRivers() {
+    this.rivers.forEach((xy) => {
+      const tile = this.getTile(xy.x, xy.y)!;
+      const river = tile.structures.filter((structure) => {
+        return structure instanceof River;
+      })[0]!;
+      if (tile.owner != null) {
+        if (river.owner == tile.owner) {
+          river.turns++;
+        } else {
+          river.owner = tile.owner;
+          river.turns = 1;
+        }
+      }
+    });
+  }
+
+  checkRiverWin(): boolean {
+    for (var i = 0; i < this.rivers.length; i++) {
+      const xy = this.rivers[i]!;
+      const tile = this.getTile(xy.x, xy.y)!;
+      const river = tile.structures.filter((structure) => {
+        return structure instanceof River;
+      })[0]!;
+      if (river.turns >= 10) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

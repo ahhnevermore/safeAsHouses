@@ -1,4 +1,4 @@
-import { Card } from "./card.js";
+import { Card } from "./util.js";
 import { Colour } from "./util.js";
 
 export class Deck {

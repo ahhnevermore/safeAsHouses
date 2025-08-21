@@ -1,4 +1,4 @@
-import { Card } from "./card.js";
+import { Card } from "./util.js";
 import { Deck } from "./deck.js";
 
 export class Player {
