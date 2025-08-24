@@ -1,52 +1,61 @@
 import { Board } from "./board.js";
-import { Card } from "./util.js";
+import { Card, TurnAction } from "./util.js";
 import { Deck } from "./deck.js";
 import { Player } from "./player.js";
-import { Server as IOServer } from "socket.io";
+import { Server as IOServer, Socket as IOSocket } from "socket.io";
 import { EventEmitter } from "events";
 import { error } from "console";
+import { Logger } from "winston";
 
 export class Room extends EventEmitter {
+  private static nextID = 1;
   deck: Deck;
   board: Board;
-  id: string | null = null;
-  players: Player[];
+  id: string;
+  players: Player[] = [];
   activeIndex: number = 0;
   turnTimer: NodeJS.Timeout | null = null;
   turnDuration: number = 30000;
-  constructor(id: string, players: Player[]) {
+
+  io: IOServer;
+  logger: Logger;
+
+  constructor(ioServer: IOServer, logger: Logger) {
     super();
     this.deck = new Deck();
     this.board = new Board();
-    this.id = id;
-    this.players = players;
+    this.id = "room-" + Room.nextID++;
+
+    this.io = ioServer;
+    this.logger = logger.child({ roomID: this.id });
   }
-  addPlayer(socketId: string, name: string) {
-    var player = new Player(socketId, name);
+
+  addPlayer(socket: IOSocket, name: string) {
+    var player = new Player(socket.id, name);
     this.players.push(player);
+    this.logger.info("A user connected:", socket.id);
+
+    socket.join(this.id);
+    this.registerHandlers(socket);
   }
 
-  removePlayer(socketId: string) {
-    this.players = this.players.filter((player) => player.id !== socketId);
-  }
-
-  startGamePred() {
+  isRoomFull() {
     return this.players.length == 4;
   }
 
-  startGame(io: IOServer) {
-    this.startTurn(io);
+  startGame() {
+    this.startTurn();
   }
 
-  startTurn(io: IOServer) {
+  startTurn() {
     try {
       const currentPlayerID = this.players[this.activeIndex]?.id as string;
-      io.to(currentPlayerID).emit("yourTurn", {
+      this.io.to(currentPlayerID).emit("yourTurn", {
         timer: this.turnDuration / 1000,
       });
       this.players.forEach((player) => {
         if (player.id != currentPlayerID) {
-          io.to(player.id as string).emit("waitTurn", {
+          this.io.to(player.id as string).emit("waitTurn", {
             currentplayer: this.activeIndex,
           });
         }
@@ -59,35 +68,46 @@ export class Room extends EventEmitter {
       // Start countdown for this turn
       this.turnTimer = setTimeout(() => {
         // Timer expired: handle timeout (e.g., auto-end turn)
-        io.to(currentPlayerID).emit("turnTimeout");
-        this.advanceTurn(io);
+        this.io.to(currentPlayerID).emit("turnTimeout");
+        this.advanceTurn();
       }, this.turnDuration);
     } catch (err) {
       this.windup("startTurn", err as Error);
     }
   }
 
-  windup(reason: string, err: Error) {
-    this.emit("windup", this.id, reason, err);
+  windup(reason: string, err?: Error) {
+    if (err) {
+      this.logger.error(`Room ${this.id} windup: ${reason}`, err);
+    } else {
+      this.logger.info(`Room ${this.id} windup: ${reason}`);
+    }
+    this.emit("windup", { reason, err });
   }
 
   // Call this when the player takes a valid action
-  refreshTurnTimer(io: IOServer) {
+  refreshTurnTimer() {
     // Reset the timer to 30 seconds
-    this.startTurn(io);
+    this.startTurn();
   }
 
-  advanceTurn(io: IOServer) {
+  advanceTurn() {
     this.activeIndex = (this.activeIndex + 1) % this.players.length;
-    this.board.this.startTurn(io);
+    const winner = this.board.checkRiverWin();
+    this.startTurn();
   }
 
-  submitTurn(io, event) {
-    switch (event) {
-      case "endTurn": {
-        this.board.this.advanceTurn(io);
-      }
-    }
+  registerHandlers(socket: IOSocket) {
+    socket.on("disconnect", () => {
+      this.players = this.players.filter((player) => {
+        player.id != socket.id;
+      });
+
+      this.logger.info("A user disconnected:", socket.id);
+    });
+
+    socket.on("submitTurn", () => {
+      this.advanceTurn();
+    });
   }
 }
-module.exports = Room;

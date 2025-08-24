@@ -14,8 +14,10 @@
     "socket.io": "^4.5.4"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/node": "^24.2.1",
     "@types/socket.io": "^3.0.1",
+    "@types/winston": "^2.4.4",
     "typescript": "^5.9.2"
   }
 }

@@ -106,7 +106,22 @@ export class Board {
     });
   }
 
-  checkRiverWin(): boolean {
+  checkBaseWin(): string | null {
+    var res = [];
+    for (var i = 0; i < this.bases.length; i++) {
+      const xy = this.bases[i]!;
+      const tile = this.getTile(xy.x, xy.y)!;
+      res.push(tile.owner);
+    }
+    return res.reduce<string | null>((acc, cur) => {
+      if (cur === null) return acc; // ignore nulls
+      if (acc === null) return cur; // first non-null found
+      if (acc === cur) return acc; // same string, still valid
+      return null; // mismatch → fail
+    }, null);
+  }
+
+  checkRiverWin(): string | null {
     for (var i = 0; i < this.rivers.length; i++) {
       const xy = this.rivers[i]!;
       const tile = this.getTile(xy.x, xy.y)!;
@@ -114,9 +129,9 @@ export class Board {
         return structure instanceof River;
       })[0]!;
       if (river.turns >= 10) {
-        return true;
+        return river.owner;
       }
     }
-    return false;
+    return null;
   }
 }
