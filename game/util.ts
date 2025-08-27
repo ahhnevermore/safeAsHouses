@@ -1,4 +1,10 @@
-export enum Colour {
+export const BOARD_SIZE: number = 9;
+export const REG_MOVE: number = 1;
+export const ACE_MOVE: number = 2;
+export const KING_RADIUS: number = 2;
+export const TILE_COINS: number = 0.1;
+
+export enum Suit {
   Black = 0,
   Red = 1,
   Green = 2,
@@ -21,9 +27,11 @@ export enum Rank {
   King = 13,
 }
 
-export enum ModScope {
+export enum Scope {
   Move = 0,
   Combat = 1,
+  Income = 2,
+  Win = 3,
 }
 
 export class Vec2 {
@@ -41,6 +49,30 @@ export class Vec2 {
     return (
       Math.abs(dest.x - this.x) <= radius && Math.abs(dest.y - this.y) <= radius
     );
+  }
+
+  getValidSquare(radius: number): Vec2[] {
+    const tiles: Vec2[] = [];
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        const x = this.x + dx;
+        const y = this.y + dy;
+
+        if (x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) continue;
+
+        tiles.push(new Vec2(x, y));
+      }
+    }
+    return tiles;
+  }
+
+  toKey(): string {
+    return `${this.x},${this.y}`;
+  }
+
+  static fromKey(key: string): Vec2 {
+    const [xStr = "0", yStr = "0"] = key.split(",");
+    return new Vec2(parseInt(xStr, 10), parseInt(yStr, 10));
   }
 }
 
@@ -62,21 +94,13 @@ export class Base {
   constructor() {}
 }
 
-export class Tower {
-  def: number = 7;
-  colour: Colour | null = null;
-  constructor(colour: Colour) {
-    this.colour = colour;
-  }
-}
-
-export type Structure = River | Base | Tower;
+export type Structure = River | Base;
 
 export class Card {
-  suit: Colour;
+  suit: Suit;
   rank: Rank;
 
-  constructor(suit: Colour, rank: Rank) {
+  constructor(suit: Suit, rank: Rank) {
     this.suit = suit;
     this.rank = rank;
   }

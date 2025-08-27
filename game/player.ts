@@ -2,7 +2,7 @@ import { Card } from "./util.js";
 import { Deck } from "./deck.js";
 
 export class Player {
-  id: string | null = null;
+  id: string;
   name: string = "Guest";
   coins: number = 10;
   hand: Card[] = [];

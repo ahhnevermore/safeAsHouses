@@ -1,5 +1,5 @@
 import { Unit } from "./unit.js";
-import type { Structure } from "./util.js";
+import { Card, Scope, type Structure } from "./util.js";
 
 export class Tile {
   owner: string | null = null;
@@ -65,5 +65,12 @@ export class Tile {
 
   addUnit(playerID: string, unit: Unit) {
     this.units[playerID]?.push(unit);
+  }
+
+  getMods(playerID: string, modScope: Scope): Card[] {
+    if (this.units[playerID]) {
+      return this.units[playerID]?.flatMap((unit) => unit.getMod(modScope));
+    }
+    return [];
   }
 }

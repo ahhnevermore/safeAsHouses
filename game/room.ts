@@ -1,5 +1,5 @@
 import { Board } from "./board.js";
-import { Card, TurnAction } from "./util.js";
+import { Card, Scope, TILE_COINS, Vec2 } from "./util.js";
 import { Deck } from "./deck.js";
 import { Player } from "./player.js";
 import { Server as IOServer, Socket as IOSocket } from "socket.io";
@@ -33,10 +33,11 @@ export class Room extends EventEmitter {
   addPlayer(socket: IOSocket, name: string) {
     var player = new Player(socket.id, name);
     this.players.push(player);
-    this.logger.info("A user connected:", socket.id);
+    this.board.territory[player.id] = new Set<string>();
 
     socket.join(this.id);
     this.registerHandlers(socket);
+    this.logger.info("A user connected:", socket.id);
   }
 
   isRoomFull() {
@@ -75,6 +76,24 @@ export class Room extends EventEmitter {
       this.windup("startTurn", err as Error);
     }
   }
+  // Call this when the player takes a valid action
+  refreshTurnTimer() {
+    // Reset the timer to 30 seconds
+    this.startTurn();
+  }
+
+  advanceTurn() {
+    this.activeIndex = (this.activeIndex + 1) % this.players.length;
+    const winner = this.board.checkRiverWin();
+    if (winner) {
+      this.broadcast(winner, Scope.Win);
+    }
+    const income = this.board.calculateIncome();
+    for (const [playerID, count] of Object.entries(income)) {
+      this.io.to(playerID).emit("income", count * TILE_COINS);
+    }
+    this.startTurn();
+  }
 
   windup(reason: string, err?: Error) {
     if (err) {
@@ -85,16 +104,14 @@ export class Room extends EventEmitter {
     this.emit("windup", { reason, err });
   }
 
-  // Call this when the player takes a valid action
-  refreshTurnTimer() {
-    // Reset the timer to 30 seconds
-    this.startTurn();
-  }
-
-  advanceTurn() {
-    this.activeIndex = (this.activeIndex + 1) % this.players.length;
-    const winner = this.board.checkRiverWin();
-    this.startTurn();
+  broadcast(msg: string, reason?: Scope) {
+    if (reason) {
+      switch (reason) {
+        case Scope.Win: {
+          this.io.to(this.id).emit("winner", msg);
+        }
+      }
+    }
   }
 
   registerHandlers(socket: IOSocket) {
