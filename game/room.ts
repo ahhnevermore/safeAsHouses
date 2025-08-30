@@ -1,11 +1,12 @@
 import { Board } from "./board.js";
-import { Card, Scope, TILE_COINS, Vec2 } from "./util.js";
+import { Card, Scope, TILE_COINS, Vec2, type ClientEvents, type ServerEvents } from "./util.js";
 import { Deck } from "./deck.js";
 import { Player } from "./player.js";
 import { Server as IOServer, Socket as IOSocket } from "socket.io";
 import { EventEmitter } from "events";
 import { error } from "console";
 import { Logger } from "winston";
+import { Unit } from "./unit.js";
 
 export class Room extends EventEmitter {
   private static nextID = 1;
@@ -17,10 +18,10 @@ export class Room extends EventEmitter {
   turnTimer: NodeJS.Timeout | null = null;
   turnDuration: number = 30000;
 
-  io: IOServer;
+  io: IOServer<ClientEvents, ServerEvents>;
   logger: Logger;
 
-  constructor(ioServer: IOServer, logger: Logger) {
+  constructor(ioServer: IOServer<ClientEvents, ServerEvents>, logger: Logger) {
     super();
     this.deck = new Deck();
     this.board = new Board();
@@ -30,7 +31,7 @@ export class Room extends EventEmitter {
     this.logger = logger.child({ roomID: this.id });
   }
 
-  addPlayer(socket: IOSocket, name: string) {
+  addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
     var player = new Player(socket.id, name);
     this.players.push(player);
     this.board.territory[player.id] = new Set<string>();
@@ -45,22 +46,19 @@ export class Room extends EventEmitter {
   }
 
   startGame() {
-    this.startTurn();
+    this.startTurnTimer();
   }
 
-  startTurn() {
+  startTurnTimer() {
     try {
       const currentPlayerID = this.players[this.activeIndex]?.id as string;
-      this.io.to(currentPlayerID).emit("yourTurn", {
-        timer: this.turnDuration / 1000,
-      });
-      this.players.forEach((player) => {
-        if (player.id != currentPlayerID) {
-          this.io.to(player.id as string).emit("waitTurn", {
-            currentplayer: this.activeIndex,
-          });
-        }
-      });
+      this.sendPlayer(currentPlayerID, "yourTurn", this.turnDuration);
+      this.sendOtherPlayers(
+        currentPlayerID,
+        "waitTurn",
+        this.players[this.activeIndex]?.name as string,
+        this.turnDuration
+      );
 
       // Clear any previous timer
       if (this.turnTimer) clearTimeout(this.turnTimer);
@@ -68,31 +66,24 @@ export class Room extends EventEmitter {
 
       // Start countdown for this turn
       this.turnTimer = setTimeout(() => {
-        // Timer expired: handle timeout (e.g., auto-end turn)
-        this.io.to(currentPlayerID).emit("turnTimeout");
         this.advanceTurn();
       }, this.turnDuration);
     } catch (err) {
-      this.windup("startTurn", err as Error);
+      this.windup("startTurnTimer", err as Error);
     }
-  }
-  // Call this when the player takes a valid action
-  refreshTurnTimer() {
-    // Reset the timer to 30 seconds
-    this.startTurn();
   }
 
   advanceTurn() {
     this.activeIndex = (this.activeIndex + 1) % this.players.length;
     const winner = this.board.checkRiverWin();
     if (winner) {
-      this.broadcast(winner, Scope.Win);
+      this.sendRoom("winner", winner);
     }
     const income = this.board.calculateIncome();
     for (const [playerID, count] of Object.entries(income)) {
-      this.io.to(playerID).emit("income", count * TILE_COINS);
+      this.sendPlayer(playerID, "income", count * TILE_COINS);
     }
-    this.startTurn();
+    this.startTurnTimer();
   }
 
   windup(reason: string, err?: Error) {
@@ -104,27 +95,79 @@ export class Room extends EventEmitter {
     this.emit("windup", { reason, err });
   }
 
-  broadcast(msg: string, reason?: Scope) {
-    if (reason) {
-      switch (reason) {
-        case Scope.Win: {
-          this.io.to(this.id).emit("winner", msg);
-        }
-      }
+  sendRoom<E extends keyof ServerEvents>(signal: E, ...args: Parameters<ServerEvents[E]>) {
+    this.io.to(this.id).emit(signal, ...args);
+  }
+
+  sendPlayer<E extends keyof ServerEvents>(
+    playerID: string,
+    signal: E,
+    ...args: Parameters<ServerEvents[E]>
+  ) {
+    this.io.to(playerID).emit(signal, ...args);
+  }
+
+  sendOtherPlayers<E extends keyof ServerEvents>(
+    playerID: string,
+    signal: E,
+    ...args: Parameters<ServerEvents[E]>
+  ) {
+    const socket = this.io.sockets.sockets.get(playerID);
+    if (socket) {
+      socket.to(this.id).emit(signal, ...args);
     }
   }
 
-  registerHandlers(socket: IOSocket) {
+  isPlayerTurn(playerID: string): boolean {
+    return this.players[this.activeIndex]?.id == playerID;
+  }
+
+  registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
     socket.on("disconnect", () => {
       this.players = this.players.filter((player) => {
         player.id != socket.id;
+        if (this.isPlayerTurn(socket.id)) {
+          this.advanceTurn();
+        }
       });
 
       this.logger.info("A user disconnected:", socket.id);
     });
 
     socket.on("submitTurn", () => {
-      this.advanceTurn();
+      if (this.isPlayerTurn(socket.id)) {
+        this.advanceTurn();
+      }
+    });
+
+    socket.on("flip", (tileID: string, unitID: number) => {
+      if (this.isPlayerTurn(socket.id)) {
+        if (this.board.flipUnit(socket.id, tileID, unitID)) {
+          this.sendRoom("flipAck", tileID, unitID, socket.id);
+          this.startTurnTimer();
+          return;
+        }
+      }
+      this.sendPlayer(socket.id, "flipRej", tileID, unitID);
+    });
+
+    socket.on("placeCard", (tileID: string, cardVal: string, bet: number) => {
+      if (this.isPlayerTurn(socket.id)) {
+        const card = Card.fromKey(cardVal);
+        const unit = new Unit(card);
+        let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, socket.id, bet);
+        if (success) {
+          if (unitSwallowed) {
+            this.sendOtherPlayers(socket.id, "placeCardPublic", tileID, bet, { unitID, cardVal });
+          } else {
+            this.sendOtherPlayers(socket.id, "placeCardPublic", tileID, bet, { unitID });
+          }
+          this.sendPlayer(socket.id, "placeCardAck", tileID, cardVal, bet, unitID, unitSwallowed);
+          this.startTurnTimer();
+          return;
+        }
+      }
+      this.sendPlayer(socket.id, "placeCardRej", tileID, cardVal, bet);
     });
   }
 }

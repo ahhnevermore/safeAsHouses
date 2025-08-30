@@ -3,7 +3,7 @@ import { Deck } from "./deck.js";
 
 export class Player {
   id: string;
-  name: string = "Guest";
+  name: string;
   coins: number = 10;
   hand: Card[] = [];
   constructor(id: string, name: string) {

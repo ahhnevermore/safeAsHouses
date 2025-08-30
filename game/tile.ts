@@ -9,11 +9,21 @@ export class Tile {
 
   constructor() {}
 
-  placeUnit(unit: Unit, playerID: string, bet: number): boolean {
-    if (this.owner == null || (this.owner != playerID && this.noCards())) {
+  placeUnit(
+    unit: Unit,
+    playerID: string,
+    bet: number
+  ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: number] {
+    var territoryCaptured = false;
+    var success = false;
+    var unitSwallowed = false;
+    var unitID = unit.id;
+    if (this.owner != playerID && this.noCards()) {
       this.owner = playerID;
+      territoryCaptured = true;
     }
     if (this.units[playerID] != null) {
+      //solitaire play
       if (this.onlyOnePlayerCards(playerID)) {
         const faceupCard = this.units[playerID].filter((unit) => {
           return unit.faceup;
@@ -23,20 +33,28 @@ export class Tile {
           const topCard = unit.stack[0];
           if (topCard) {
             faceupCard.addToStack(topCard);
-          } else {
-            return false;
+            success = true;
+            unitSwallowed = true;
+            unitID = faceupCard.id;
           }
-        } else {
-          return false;
         }
+        //combat situation
       } else {
         this.units[playerID].push(unit);
+        success = true;
       }
     } else {
       this.units[playerID] = [unit];
     }
-    this.bets[playerID] = bet;
-    return true;
+
+    if (bet > 0) {
+      if (this.bets[playerID]) {
+        this.bets[playerID] += bet;
+      } else {
+        this.bets[playerID] = bet;
+      }
+    }
+    return [success, territoryCaptured, unitSwallowed, unitID];
   }
 
   noCards(): boolean {
@@ -58,9 +76,7 @@ export class Tile {
   }
 
   removeUnit(playerID: string, unitID: number) {
-    this.units[playerID] = this.units[playerID]?.filter(
-      (unit) => unit.id != unitID
-    )!;
+    this.units[playerID] = this.units[playerID]?.filter((unit) => unit.id != unitID)!;
   }
 
   addUnit(playerID: string, unit: Unit) {
