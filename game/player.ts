@@ -1,9 +1,9 @@
-import { Card } from "./card.js";
+import { Card } from "./util.js";
 import { Deck } from "./deck.js";
 
 export class Player {
-  id: string | null = null;
-  name: string = "Guest";
+  id: string;
+  name: string;
   coins: number = 10;
   hand: Card[] = [];
   constructor(id: string, name: string) {

@@ -1,31 +1,92 @@
-import { Card, Unit } from "./card.js";
-
-export class Vec2 {
-  x: number;
-  y: number;
-  constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
-  }
-}
+import { Unit } from "./unit.js";
+import { Card, Scope, type Structure } from "./util.js";
 
 export class Tile {
   owner: string | null = null;
-  cards: Record<string, Card[]> = {};
+  units: Record<string, Unit[]> = {};
   bets: Record<string, number> = {};
-  constructor() {
-    this.cards = {};
+  structures: Structure[] = [];
+
+  constructor() {}
+
+  placeUnit(
+    unit: Unit,
+    playerID: string,
+    bet: number
+  ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: number] {
+    var territoryCaptured = false;
+    var success = false;
+    var unitSwallowed = false;
+    var unitID = unit.id;
+    if (this.owner != playerID && this.noCards()) {
+      this.owner = playerID;
+      territoryCaptured = true;
+    }
+    if (this.units[playerID] != null) {
+      //solitaire play
+      if (this.onlyOnePlayerCards(playerID)) {
+        const faceupCard = this.units[playerID].filter((unit) => {
+          return unit.faceup;
+        })[0];
+        if (faceupCard) {
+          //this case is for handling placing a card onto only one faceup unit
+          const topCard = unit.stack[0];
+          if (topCard) {
+            faceupCard.addToStack(topCard);
+            success = true;
+            unitSwallowed = true;
+            unitID = faceupCard.id;
+          }
+        }
+        //combat situation
+      } else {
+        this.units[playerID].push(unit);
+        success = true;
+      }
+    } else {
+      this.units[playerID] = [unit];
+    }
+
+    if (bet > 0) {
+      if (this.bets[playerID]) {
+        this.bets[playerID] += bet;
+      } else {
+        this.bets[playerID] = bet;
+      }
+    }
+    return [success, territoryCaptured, unitSwallowed, unitID];
   }
 
-  placeCard(card: Card, playerID: string, bet: number) {
-    if (this.owner == null) {
-      this.owner = playerID;
+  noCards(): boolean {
+    return Object.values(this.units).every((arr) => !arr || arr.length === 0);
+  }
+
+  onlyOnePlayerCards(key: string): boolean {
+    return Object.entries(this.units)
+      .filter(([k]) => k !== key)
+      .every(([_, arr]) => (arr ?? []).length === 0); // undefined → []
+  }
+
+  addStructure(structure: Structure) {
+    this.structures.push(structure);
+  }
+
+  getUnit(playerID: string, unitID: number): Unit | undefined {
+    return this.units[playerID]?.filter((unit) => unit.id == unitID)[0];
+  }
+
+  removeUnit(playerID: string, unitID: number) {
+    this.units[playerID] = this.units[playerID]?.filter((unit) => unit.id != unitID)!;
+  }
+
+  addUnit(playerID: string, unit: Unit) {
+    this.units[playerID]?.push(unit);
+  }
+
+  getMods(playerID: string, modScope: Scope): Card[] {
+    if (this.units[playerID]) {
+      return this.units[playerID]?.flatMap((unit) => unit.getMod(modScope));
     }
-    if (this.cards[playerID] != null) {
-      this.cards[playerID].push(card);
-    } else {
-      this.cards[playerID] = [card]
-    }
-    this.bets[playerID] = bet;
+    return [];
   }
 }
