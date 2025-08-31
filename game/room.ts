@@ -8,21 +8,7 @@ import { error } from "console";
 import { Logger } from "winston";
 import { Unit } from "./unit.js";
 
-export class Room extends EventEmitter {
-  private static nextID = 1;
-  deck: Deck;
-  board: Board;
-  id: string;
-  players: Player[] = [];
-  activeIndex: number = 0;
-  turnTimer: NodeJS.Timeout | null = null;
-  turnDuration: number = 30000;
 
-  io: IOServer<ClientEvents, ServerEvents>;
-  logger: Logger;
-
-  constructor(ioServer: IOServer<ClientEvents, ServerEvents>, logger: Logger) {
-    super();
     this.deck = new Deck();
     this.board = new Board();
     this.id = "room-" + Room.nextID++;
@@ -31,38 +17,20 @@ export class Room extends EventEmitter {
     this.logger = logger.child({ roomID: this.id });
   }
 
-  addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
-    var player = new Player(socket.id, name);
-    this.players.push(player);
-    this.board.territory[player.id] = new Set<string>();
 
     socket.join(this.id);
     this.registerHandlers(socket);
     this.logger.info("A user connected:", socket.id);
   }
 
-  isRoomFull() {
-    return this.players.length == 4;
+
   }
 
   startGame() {
     this.startTurnTimer();
   }
 
-  startTurnTimer() {
-    try {
-      const currentPlayerID = this.players[this.activeIndex]?.id as string;
-      this.sendPlayer(currentPlayerID, "yourTurn", this.turnDuration);
-      this.sendOtherPlayers(
-        currentPlayerID,
-        "waitTurn",
-        this.players[this.activeIndex]?.name as string,
-        this.turnDuration
-      );
 
-      // Clear any previous timer
-      if (this.turnTimer) clearTimeout(this.turnTimer);
-      this.turnTimer = null;
 
       // Start countdown for this turn
       this.turnTimer = setTimeout(() => {
@@ -86,35 +54,7 @@ export class Room extends EventEmitter {
     this.startTurnTimer();
   }
 
-  windup(reason: string, err?: Error) {
-    if (err) {
-      this.logger.error(`Room ${this.id} windup: ${reason}`, err);
-    } else {
-      this.logger.info(`Room ${this.id} windup: ${reason}`);
-    }
-    this.emit("windup", { reason, err });
-  }
 
-  sendRoom<E extends keyof ServerEvents>(signal: E, ...args: Parameters<ServerEvents[E]>) {
-    this.io.to(this.id).emit(signal, ...args);
-  }
-
-  sendPlayer<E extends keyof ServerEvents>(
-    playerID: string,
-    signal: E,
-    ...args: Parameters<ServerEvents[E]>
-  ) {
-    this.io.to(playerID).emit(signal, ...args);
-  }
-
-  sendOtherPlayers<E extends keyof ServerEvents>(
-    playerID: string,
-    signal: E,
-    ...args: Parameters<ServerEvents[E]>
-  ) {
-    const socket = this.io.sockets.sockets.get(playerID);
-    if (socket) {
-      socket.to(this.id).emit(signal, ...args);
     }
   }
 

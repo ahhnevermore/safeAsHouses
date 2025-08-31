@@ -3,21 +3,25 @@
   "version": "1.0.0",
   "type": "module",
   "description": "A browser-based board game with cards, backend in Node.js, communication via Socket.IO.",
-  "main": "server.js",
+  "main": "dist/gameserver.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node dist/gameserver.js",
+    "build": "tsc",
+    "dev": "concurrently \"tsc --watch\" \"node --watch dist/gameserver.js\"",
+    "clean": "rm -rf dist/",
+    "rebuild": "npm run clean && npm run build",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
+    "cookie-parser": "^1.4.6",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",
     "pixi.js": "^8.10.1",
-    "socket.io": "^4.5.4"
+    "socket.io": "^4.5.4",
+    "winston": "^3.12.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.2.1",
-    "@types/socket.io": "^3.0.1",
-    "@types/winston": "^2.4.4",
+
     "typescript": "^5.9.2"
   }
 }
