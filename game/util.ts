@@ -3,11 +3,12 @@ export const REG_MOVE: number = 1;
 export const ACE_MOVE: number = 2;
 export const KING_RADIUS: number = 2;
 export const TILE_COINS: number = 0.1;
-
+export const CARD_PRICE: number = 1;
 export type ClientEvents = {
   flip: (tileID: string, unitID: number) => void;
   submitTurn: () => void;
   placeCard: (tileID: string, cardVal: string, bet: number) => void;
+  buyCard: () => void;
 };
 
 export type ServerEvents = {
@@ -30,6 +31,9 @@ export type ServerEvents = {
     data: { unitID: number } | { unitID: number; cardVal: string }
   ) => void;
   placeCardRej: (tileID: string, cardVal: string, bet: number) => void;
+  buyCardPublic: () => void;
+  buyCardAck: (cardVal: string) => void;
+  buyCardRej: () => void;
 };
 
 export enum Suit {

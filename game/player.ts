@@ -1,4 +1,4 @@
-import { Card } from "./util.js";
+import { Card, CARD_PRICE } from "./util.js";
 import { Deck } from "./deck.js";
 
 export class Player {
@@ -11,16 +11,23 @@ export class Player {
     this.name = name;
   }
 
-  buyCard(deck: Deck) {
-    const cardCost = 2;
-    if (this.coins >= cardCost) {
-      const card = deck.deal(1)[0];
-      if (card) {
-        this.hand.push(card);
-        this.coins -= cardCost;
-        return card;
-      }
-    }
-    return null;
+  buyCard(card: Card): number {
+    this.hand.push(card);
+    this.coins -= CARD_PRICE;
+    return CARD_PRICE;
+  }
+
+  canBuyCard(): boolean {
+    return this.coins >= CARD_PRICE;
+  }
+
+  hasCard(cardVal: string): boolean {
+    return this.hand.some((card) => {
+      card.toKey() == cardVal;
+    });
+  }
+
+  discard(cardVal: string) {
+    this.hand = this.hand.filter((card) => card.toKey() != cardVal);
   }
 }

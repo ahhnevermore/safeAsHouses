@@ -10,6 +10,7 @@ import { Unit } from "./unit.js";
 
 export class Room extends EventEmitter {
   private static nextID = 1;
+  pot: number = 0;
   deck: Deck;
   board: Board;
   id: string;
@@ -122,6 +123,10 @@ export class Room extends EventEmitter {
     return this.players[this.activeIndex]?.id == playerID;
   }
 
+  getCurrPlayer(): Player | undefined {
+    return this.players[this.activeIndex];
+  }
+
   registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
     socket.on("disconnect", () => {
       this.players = this.players.filter((player) => {
@@ -152,11 +157,14 @@ export class Room extends EventEmitter {
     });
 
     socket.on("placeCard", (tileID: string, cardVal: string, bet: number) => {
-      if (this.isPlayerTurn(socket.id)) {
+      const currPlayer = this.getCurrPlayer();
+      if (currPlayer && currPlayer.id == socket.id && currPlayer.hasCard(cardVal)) {
         const card = Card.fromKey(cardVal);
         const unit = new Unit(card);
         let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, socket.id, bet);
         if (success) {
+          currPlayer.discard(cardVal);
+          this.deck.addDiscard(Card.fromKey(cardVal));
           if (unitSwallowed) {
             this.sendOtherPlayers(socket.id, "placeCardPublic", tileID, bet, { unitID, cardVal });
           } else {
@@ -169,5 +177,20 @@ export class Room extends EventEmitter {
       }
       this.sendPlayer(socket.id, "placeCardRej", tileID, cardVal, bet);
     });
+
+    socket.on("buyCard", () => {
+      const currPlayer = this.getCurrPlayer();
+      if (currPlayer && currPlayer.id == socket.id && currPlayer.canBuyCard()) {
+        const card = this.deck.deal(1)[0];
+        if (card) {
+          const fee = currPlayer.buyCard(card);
+          this.pot += fee;
+          this.sendOtherPlayers(socket.id, "buyCardPublic");
+          this.sendPlayer(socket.id, "buyCardAck", card.toKey());
+        }
+      }
+      this.sendPlayer(socket.id, "buyCardRej")
+    });
+    
   }
 }
