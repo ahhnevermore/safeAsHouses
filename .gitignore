@@ -4,6 +4,7 @@
 # Node modules
 node_modules/
 dist/
+public/
 
 # Logs
 logs
@@ -20,7 +21,3 @@ Thumbs.db
 .vscode/
 .idea/
 *.iml
-
-server.crt
-server.key
-localhost.pfx

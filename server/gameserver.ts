@@ -2,8 +2,8 @@ import { createLogger, format as wFormat, transports as wTransports } from "wins
 import express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
-import { Room } from "./game/room.js";
-import type { ClientEvents, ServerEvents } from "./game/util.js";
+import { Room } from "../game/room.js";
+import type { ClientEvents, ServerEvents } from "../game/util.js";
 
 const logger = createLogger({
   level: process.env.NODE_ENV === "production" ? "info" : "debug",
@@ -13,12 +13,17 @@ const logger = createLogger({
 
 const app = express();
 app.set("trust proxy", 1);
+app.use(express.static("public"));
 
 const server = createServer(app);
-const io = new Server<ClientEvents, ServerEvents>(server);
+const io = new Server<ClientEvents, ServerEvents>(server, {
+  cors: {
+    origin: "http://localhost:5173", // your client dev port
+    methods: ["GET", "POST"],
+  },
+});
 
 app.use(express.json());
-app.use(express.static("public"));
 
 let rooms: Record<string, Room> = {};
 let waitingRoom: Room | null = null;
