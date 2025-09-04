@@ -9,6 +9,7 @@ export type ClientEvents = {
   submitTurn: () => void;
   placeCard: (tileID: string, cardVal: string, bet: number) => void;
   buyCard: () => void;
+  joinGame: () => void;
 };
 
 export type ServerEvents = {
@@ -34,6 +35,7 @@ export type ServerEvents = {
   buyCardPublic: () => void;
   buyCardAck: (cardVal: string) => void;
   buyCardRej: () => void;
+  joinGameAck: () => void;
 };
 
 export enum Suit {
@@ -63,6 +65,13 @@ export enum Scope {
   Move = 0,
   Combat = 1,
   Income = 2,
+}
+
+export enum ClientState {
+  MainMenu = 0,
+  Lobby = 1,
+  Game = 2,
+  Victory = 3,
 }
 
 export class Vec2 {

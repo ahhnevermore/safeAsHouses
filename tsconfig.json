@@ -4,11 +4,13 @@
     "module": "nodenext",
     "moduleResolution": "NodeNext",
     "target": "esnext",
+    "lib": ["esnext", "dom"],
     "strict": true,
     "esModuleInterop": true,
     "sourceMap": true,
     "skipLibCheck": true,
-    "incremental": true
+    "incremental": true,
+    "types": ["vite/client"]
   },
-  "include": ["server/**/*"]
+  "include": ["server/**/*", "client/**/*"]
 }
