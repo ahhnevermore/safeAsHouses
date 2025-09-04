@@ -24,7 +24,7 @@ export class MainMenuState implements IState {
     button.eventMode = "static";
     button.cursor = "pointer";
     button.on("pointertap", () => {
-      this.manager.changeState(ClientState.Lobby);
+      this.manager.joinGame();
     });
 
     this.container.addChild(button, text, introText);

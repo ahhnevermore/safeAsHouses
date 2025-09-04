@@ -22,9 +22,7 @@ export class Player {
   }
 
   hasCard(cardVal: string): boolean {
-    return this.hand.some((card) => {
-      card.toKey() == cardVal;
-    });
+    return this.hand.some((card) => card.toKey() == cardVal);
   }
 
   discard(cardVal: string) {

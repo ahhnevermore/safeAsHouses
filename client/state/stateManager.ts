@@ -58,9 +58,13 @@ export class StateManager {
     newState.enter(props);
   }
 
+  joinGame() {
+    this.socket.emit("joinGame");
+  }
+
   registerHandlers(socket: Socket<ServerEvents, ClientEvents>) {
-    socket.on("joinGameAck", () => {
-      this.changeState(ClientState.Lobby, {});
+    socket.on("joinGameAck", (numPlayers) => {
+      this.changeState(ClientState.Lobby, { currentPlayers: numPlayers });
     });
   }
 }

@@ -25,9 +25,7 @@ export class Tile {
     if (this.units[playerID] != null) {
       //solitaire play
       if (this.onlyOnePlayerCards(playerID)) {
-        const faceupCard = this.units[playerID].filter((unit) => {
-          return unit.faceup;
-        })[0];
+        const faceupCard = this.units[playerID].filter((unit) => unit.faceup)[0];
         if (faceupCard) {
           //this case is for handling placing a card onto only one faceup unit
           const topCard = unit.stack[0];

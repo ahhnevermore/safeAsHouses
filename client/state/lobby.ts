@@ -18,6 +18,12 @@ export class LobbyState implements IState {
     this.container.y = 200;
   }
 
-  enter() {}
+  setPlayers(num: number) {
+    this.text.text = `Waiting for players: ${num} /4`;
+  }
+
+  enter(props?: Record<string, unknown>) {
+    this.setPlayers(props?.currentPlayers as number);
+  }
   exit() {}
 }

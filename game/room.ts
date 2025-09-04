@@ -40,6 +40,7 @@ export class Room extends EventEmitter {
     socket.join(this.id);
     this.registerHandlers(socket);
     this.logger.info("A user connected:", socket.id);
+    this.sendRoom("joinGameAck", this.players.length);
   }
 
   isRoomFull() {
@@ -129,12 +130,10 @@ export class Room extends EventEmitter {
 
   registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
     socket.on("disconnect", () => {
-      this.players = this.players.filter((player) => {
-        player.id != socket.id;
-        if (this.isPlayerTurn(socket.id)) {
-          this.advanceTurn();
-        }
-      });
+      if (this.isPlayerTurn(socket.id)) {
+        this.advanceTurn();
+      }
+      this.players = this.players.filter((player) => player.id != socket.id);
 
       this.logger.info("A user disconnected:", socket.id);
     });
@@ -187,10 +186,10 @@ export class Room extends EventEmitter {
           this.pot += fee;
           this.sendOtherPlayers(socket.id, "buyCardPublic");
           this.sendPlayer(socket.id, "buyCardAck", card.toKey());
+          return;
         }
       }
-      this.sendPlayer(socket.id, "buyCardRej")
+      this.sendPlayer(socket.id, "buyCardRej");
     });
-    
   }
 }

@@ -29,21 +29,23 @@ let rooms: Record<string, Room> = {};
 let waitingRoom: Room | null = null;
 
 io.on("connection", (socket) => {
-  const username = socket.handshake.auth.username || "Guest";
+  socket.on("joinGame", () => {
+    const username = socket.handshake.auth.username || "Guest";
 
-  if (!waitingRoom) {
-    const newRoom = new Room(io, logger);
-    newRoom.on("windup", () => {
-      delete rooms[newRoom.id];
-    });
-    waitingRoom = newRoom;
-  }
-  waitingRoom.addPlayer(socket, username);
-  if (waitingRoom.isRoomFull()) {
-    waitingRoom.startGame();
-    rooms[waitingRoom.id] = waitingRoom;
-    waitingRoom = null;
-  }
+    if (!waitingRoom) {
+      const newRoom = new Room(io, logger);
+      newRoom.on("windup", () => {
+        delete rooms[newRoom.id];
+      });
+      waitingRoom = newRoom;
+    }
+    waitingRoom.addPlayer(socket, username);
+    if (waitingRoom.isRoomFull()) {
+      waitingRoom.startGame();
+      rooms[waitingRoom.id] = waitingRoom;
+      waitingRoom = null;
+    }
+  });
 });
 
 // Start the server

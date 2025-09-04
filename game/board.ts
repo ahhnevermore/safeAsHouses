@@ -110,9 +110,7 @@ export class Board {
   updateRivers() {
     this.rivers.forEach((xy) => {
       const tile = this.getTile(xy.x, xy.y)!;
-      const river = tile.structures.filter((structure) => {
-        return structure instanceof River;
-      })[0]!;
+      const river = tile.structures.filter((structure) => structure instanceof River)[0]!;
       if (tile.owner != null) {
         if (river.owner == tile.owner) {
           river.turns++;
@@ -143,9 +141,7 @@ export class Board {
     for (var i = 0; i < this.rivers.length; i++) {
       const xy = this.rivers[i]!;
       const tile = this.getTile(xy.x, xy.y)!;
-      const river = tile.structures.filter((structure) => {
-        return structure instanceof River;
-      })[0]!;
+      const river = tile.structures.filter((structure) => structure instanceof River)[0]!;
       if (river.turns >= 10) {
         return river.owner;
       }

@@ -35,7 +35,7 @@ export type ServerEvents = {
   buyCardPublic: () => void;
   buyCardAck: (cardVal: string) => void;
   buyCardRej: () => void;
-  joinGameAck: () => void;
+  joinGameAck: (numPlayers: number) => void;
 };
 
 export enum Suit {
