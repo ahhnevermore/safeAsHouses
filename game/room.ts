@@ -1,5 +1,6 @@
 import { Board } from "./board.js";
-import { Card, Scope, TILE_COINS, Vec2, type ClientEvents, type ServerEvents } from "./util.js";
+import { type ClientEvents, type ServerEvents } from "./events.js";
+import { Card, Scope, TILE_COINS, Vec2 } from "./util.js";
 import { Deck } from "./deck.js";
 import { Player } from "./player.js";
 import { Server as IOServer, Socket as IOSocket } from "socket.io";
@@ -48,19 +49,15 @@ export class Room extends EventEmitter {
   }
 
   startGame() {
+    this.sendRoom("gameStart");
     this.startTurnTimer();
   }
 
   startTurnTimer() {
     try {
       const currentPlayerID = this.players[this.activeIndex]?.id as string;
-      this.sendPlayer(currentPlayerID, "yourTurn", this.turnDuration);
-      this.sendOtherPlayers(
-        currentPlayerID,
-        "waitTurn",
-        this.players[this.activeIndex]?.name as string,
-        this.turnDuration
-      );
+      this.sendPlayer(currentPlayerID, "yourTurn", this.activeIndex, this.turnDuration);
+      this.sendOtherPlayers(currentPlayerID, "waitTurn", this.activeIndex, this.turnDuration);
 
       // Clear any previous timer
       if (this.turnTimer) clearTimeout(this.turnTimer);
@@ -130,11 +127,13 @@ export class Room extends EventEmitter {
 
   registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
     socket.on("disconnect", () => {
+      this.sendRoom("dcPlayer", this.activeIndex);
       if (this.isPlayerTurn(socket.id)) {
         this.advanceTurn();
+      } else {
+        this.activeIndex--;
       }
       this.players = this.players.filter((player) => player.id != socket.id);
-
       this.logger.info("A user disconnected:", socket.id);
     });
 

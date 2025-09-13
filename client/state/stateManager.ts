@@ -1,5 +1,6 @@
 import * as PIXI from "pixi.js";
-import { ClientEvents, ClientState, ServerEvents } from "../../game/util.js";
+import { ClientEvents, ServerEvents } from "../../game/events.js";
+import { ClientState } from "../../game/util.js";
 import { Socket } from "socket.io-client";
 import { MainMenuState } from "./mainMenu.js";
 import { LobbyState } from "./lobby.js";
@@ -63,8 +64,18 @@ export class StateManager {
   }
 
   registerHandlers(socket: Socket<ServerEvents, ClientEvents>) {
-    socket.on("joinGameAck", (numPlayers) => {
-      this.changeState(ClientState.Lobby, { currentPlayers: numPlayers });
+    socket.on("joinGameAck", (numPlayers) =>
+      this.changeState(ClientState.Lobby, { currentPlayers: numPlayers })
+    );
+
+    socket.on("gameStart", () => this.changeState(ClientState.Game));
+
+    socket.on("yourTurn", (playerIndex, duration) => {
+      this.game.updateMyTurn(true, playerIndex, duration);
     });
+
+    socket.on("waitTurn", (playerIndex, duration) =>
+      this.game.updateMyTurn(false, playerIndex, duration)
+    );
   }
 }

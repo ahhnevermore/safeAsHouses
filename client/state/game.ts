@@ -6,6 +6,10 @@ import { ClientState } from "../../game/util.js";
 export class GameState implements IState {
   container = new PIXI.Container();
   manager: StateManager;
+  myTurn: boolean = false;
+  duration: number = 0;
+  activeIndex: number = 0;
+  players: string[] = [];
 
   constructor(stateManager: StateManager) {
     this.manager = stateManager;
@@ -26,6 +30,11 @@ export class GameState implements IState {
     });
   }
 
+  updateMyTurn(myTurn: boolean, playerIndex: number, duration: number) {
+    this.myTurn = myTurn;
+    this.duration = duration;
+    this.activeIndex = playerIndex;
+  }
   enter() {}
   exit() {}
 }
