@@ -1,5 +1,6 @@
 import * as PIXI from "pixi.js";
 import { IState, StateManager } from "./stateManager.js";
+import { PLAYER_COUNT } from "../../game/util.js";
 
 export class LobbyState implements IState {
   container = new PIXI.Container();
@@ -19,7 +20,7 @@ export class LobbyState implements IState {
   }
 
   setPlayers(num: number) {
-    this.text.text = `Waiting for players: ${num} /4`;
+    this.text.text = `Waiting for players: ${num}/${PLAYER_COUNT}`;
   }
 
   enter(props?: Record<string, unknown>) {

@@ -1,6 +1,6 @@
 import { Board } from "./board.js";
 import { type ClientEvents, type ServerEvents } from "./events.js";
-import { Card, Scope, TILE_COINS, Vec2 } from "./util.js";
+import { Card, PLAYER_COUNT, Scope, TILE_COINS, Vec2 } from "./util.js";
 import { Deck } from "./deck.js";
 import { Player } from "./player.js";
 import { Server as IOServer, Socket as IOSocket } from "socket.io";
@@ -45,7 +45,7 @@ export class Room extends EventEmitter {
   }
 
   isRoomFull() {
-    return this.players.length == 4;
+    return this.players.length == PLAYER_COUNT;
   }
 
   startGame() {

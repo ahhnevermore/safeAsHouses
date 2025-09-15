@@ -4,7 +4,7 @@ export const ACE_MOVE: number = 2;
 export const KING_RADIUS: number = 2;
 export const TILE_COINS: number = 0.1;
 export const CARD_PRICE: number = 1;
-
+export const PLAYER_COUNT: number = 4;
 
 export enum Suit {
   Black = 0,
