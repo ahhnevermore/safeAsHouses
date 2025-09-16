@@ -70,8 +70,8 @@ export class StateManager {
 
     socket.on("gameStart", () => this.changeState(ClientState.Game));
 
-    socket.on("yourTurn", (playerIndex, duration) => {
-      this.game.updateMyTurn(true, playerIndex, duration);
+    socket.on("yourTurn", (publicID, duration) => {
+      this.game.updateMyTurn(true, publicID, duration);
     });
 
     socket.on("waitTurn", (playerIndex, duration) =>

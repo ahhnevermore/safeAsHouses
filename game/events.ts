@@ -9,8 +9,8 @@ export type ClientEvents = {
 export type ServerEvents = {
   flipAck: (tileID: string, unitID: number, playerID: string) => void;
   flipRej: (tileID: string, unitID: number) => void;
-  yourTurn: (playerIndex: number, duration: number) => void;
-  waitTurn: (playerIndex: number, duration: number) => void;
+  yourTurn: (publicID: string, duration: number) => void;
+  waitTurn: (publicID: string, duration: number) => void;
   winner: (playerName: string) => void;
   income: (amount: number) => void;
   placeCardAck: (
@@ -31,5 +31,5 @@ export type ServerEvents = {
   buyCardRej: () => void;
   joinGameAck: (numPlayers: number) => void;
   gameStart: () => void;
-  dcPlayer: (playerIndex: number) => void;
+  dcPlayer: (publicID: string) => void;
 };

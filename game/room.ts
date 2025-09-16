@@ -34,7 +34,7 @@ export class Room extends EventEmitter {
   }
 
   addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
-    var player = new Player(socket.id, name);
+    var player = new Player(socket.id, name, this.players.length.toString());
     this.players.push(player);
     this.board.territory[player.id] = new Set<string>();
 
@@ -55,9 +55,15 @@ export class Room extends EventEmitter {
 
   startTurnTimer() {
     try {
-      const currentPlayerID = this.players[this.activeIndex]?.id as string;
-      this.sendPlayer(currentPlayerID, "yourTurn", this.activeIndex, this.turnDuration);
-      this.sendOtherPlayers(currentPlayerID, "waitTurn", this.activeIndex, this.turnDuration);
+      const currentPlayer = this.players[this.activeIndex];
+
+      this.sendPlayer(currentPlayer.id, "yourTurn", currentPlayer.publicID, this.turnDuration);
+      this.sendOtherPlayers(
+        currentPlayer.id,
+        "waitTurn",
+        currentPlayer.publicID,
+        this.turnDuration
+      );
 
       // Clear any previous timer
       if (this.turnTimer) clearTimeout(this.turnTimer);
@@ -76,7 +82,10 @@ export class Room extends EventEmitter {
     this.activeIndex = (this.activeIndex + 1) % this.players.length;
     const winner = this.board.checkRiverWin();
     if (winner) {
-      this.sendRoom("winner", winner);
+      const winningPlayer = this.players.find((pl) => pl.id == winner);
+      if (winningPlayer) {
+        this.sendRoom("winner", winningPlayer.publicID);
+      }
     }
     const income = this.board.calculateIncome();
     for (const [playerID, count] of Object.entries(income)) {
@@ -127,14 +136,17 @@ export class Room extends EventEmitter {
 
   registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
     socket.on("disconnect", () => {
-      this.sendRoom("dcPlayer", this.activeIndex);
-      if (this.isPlayerTurn(socket.id)) {
-        this.advanceTurn();
-      } else {
-        this.activeIndex--;
+      const dcPlayer = this.players.find((pl) => pl.id == socket.id);
+      if (dcPlayer) {
+        this.sendRoom("dcPlayer", dcPlayer.publicID);
+        if (this.isPlayerTurn(socket.id)) {
+          this.advanceTurn();
+        } else {
+          this.activeIndex--;
+        }
+        this.players = this.players.filter((player) => player.id != socket.id);
+        this.logger.info("A user disconnected:", socket.id);
       }
-      this.players = this.players.filter((player) => player.id != socket.id);
-      this.logger.info("A user disconnected:", socket.id);
     });
 
     socket.on("submitTurn", () => {

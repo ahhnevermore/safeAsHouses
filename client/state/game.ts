@@ -8,7 +8,7 @@ export class GameState implements IState {
   manager: StateManager;
   myTurn: boolean = false;
   duration: number = 0;
-  activeIndex: number = 0;
+  activePlayerID: string = "";
   players: string[] = [];
 
   constructor(stateManager: StateManager) {
@@ -30,10 +30,10 @@ export class GameState implements IState {
     });
   }
 
-  updateMyTurn(myTurn: boolean, playerIndex: number, duration: number) {
+  updateMyTurn(myTurn: boolean, publicID: string, duration: number) {
     this.myTurn = myTurn;
     this.duration = duration;
-    this.activeIndex = playerIndex;
+    this.activePlayerID = publicID;
   }
   enter() {}
   exit() {}

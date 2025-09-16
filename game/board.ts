@@ -12,14 +12,16 @@ import {
   REG_MOVE,
   ACE_MOVE,
   KING_RADIUS,
+  RIVERS,
+  BASES,
 } from "./util.js";
 
 export class Board {
   grid: Tile[][] = Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, () => new Tile())
   );
-  rivers: Vec2[] = [new Vec2(4, 4)];
-  bases: Vec2[] = [new Vec2(0, 0), new Vec2(0, 8), new Vec2(8, 0), new Vec2(8, 8)];
+  rivers: Vec2[] = RIVERS.map((el) => Vec2.fromKey(el));
+  bases: Vec2[] = BASES.map((el) => Vec2.fromKey(el));
   territory: Record<string, Set<string>> = {};
 
   constructor() {

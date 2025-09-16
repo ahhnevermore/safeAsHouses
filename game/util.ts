@@ -5,6 +5,8 @@ export const KING_RADIUS: number = 2;
 export const TILE_COINS: number = 0.1;
 export const CARD_PRICE: number = 1;
 export const PLAYER_COUNT: number = 4;
+export const RIVERS: string[] = ["4,4"];
+export const BASES: string[] = ["0,0", "0,8", "8,0", "8,8"];
 
 export enum Suit {
   Black = 0,
