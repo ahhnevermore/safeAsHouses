@@ -48,4 +48,8 @@ export class Player {
       hand: this.hand.map((card) => card.toKey()),
     };
   }
+
+  takeCards(cards: Card[]) {
+    this.hand.push(...cards);
+  }
 }

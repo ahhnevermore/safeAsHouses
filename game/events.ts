@@ -1,3 +1,5 @@
+import { playerDTO, selfDTO } from "./dto.js";
+
 export type ClientEvents = {
   flip: (tileID: string, unitID: number) => void;
   submitTurn: () => void;
@@ -7,11 +9,11 @@ export type ClientEvents = {
 };
 
 export type ServerEvents = {
-  flipAck: (tileID: string, unitID: number, playerID: string) => void;
+  flipAck: (publicID: string, tileID: string, unitID: number) => void;
   flipRej: (tileID: string, unitID: number) => void;
   yourTurn: (publicID: string, duration: number) => void;
   waitTurn: (publicID: string, duration: number) => void;
-  winner: (playerName: string) => void;
+  winner: (publicID: string) => void;
   income: (amount: number) => void;
   placeCardAck: (
     tileID: string,
@@ -21,15 +23,16 @@ export type ServerEvents = {
     swallowed: boolean
   ) => void;
   placeCardPublic: (
+    publicID: string,
     tileID: string,
     bet: number,
     data: { unitID: number } | { unitID: number; cardVal: string }
   ) => void;
   placeCardRej: (tileID: string, cardVal: string, bet: number) => void;
-  buyCardPublic: () => void;
+  buyCardPublic: (publicID: string) => void;
   buyCardAck: (cardVal: string) => void;
   buyCardRej: () => void;
   joinGameAck: (numPlayers: number) => void;
-  gameStart: () => void;
+  gameStart: (playerList: playerDTO[], dto: selfDTO) => void;
   dcPlayer: (publicID: string) => void;
 };

@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import { Room } from "../game/room.js";
-import type { ClientEvents, ServerEvents } from "../game/util.js";
+import type { ClientEvents, ServerEvents } from "../game/events.js";
 
 const logger = createLogger({
   level: process.env.NODE_ENV === "production" ? "info" : "debug",

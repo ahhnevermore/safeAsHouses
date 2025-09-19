@@ -47,7 +47,7 @@ export class Board {
       let [success, territoryCaptured, unitSwallowed, unitID] = tile.placeUnit(unit, playerID, bet);
       if (success) {
         if (territoryCaptured) {
-          this.territory[playerID]?.add(xy.toKey());
+          this.capture(playerID, xy);
         }
         return [success, unitSwallowed, unitID];
       }
@@ -64,7 +64,7 @@ export class Board {
         const destTile = this.getTile(dest.x, dest.y);
         if (destTile) {
           if (destTile.noCards()) {
-            this.territory[playerID]?.add(dest.toKey());
+            this.capture(playerID, dest);
           }
           destTile.addUnit(playerID, unit);
           return true;
@@ -189,5 +189,26 @@ export class Board {
       }
     }
     return false;
+  }
+
+  capture(playerID: string, tileVec: Vec2) {
+    const tile = this.getTile(tileVec.x, tileVec.y);
+    if (tile) {
+      const prevOwner = tile.owner;
+      tile.owner = playerID;
+      let playerTiles = this.territory[playerID];
+      if (!playerTiles) {
+        playerTiles = this.territory[playerID] = new Set<string>();
+      }
+      const tileID = tileVec.toKey();
+      playerTiles.add(tileID);
+
+      if (prevOwner) {
+        let prevOwnerTiles = this.territory[prevOwner];
+        if (prevOwnerTiles) {
+          prevOwnerTiles.delete(tileID);
+        }
+      }
+    }
   }
 }

@@ -19,7 +19,6 @@ export class Tile {
     var unitSwallowed = false;
     var unitID = unit.id;
     if (this.owner != playerID && this.noCards()) {
-      this.owner = playerID;
       territoryCaptured = true;
     }
     if (this.units[playerID] != null) {

@@ -4,7 +4,7 @@ import { MainMenuState } from "./state/mainMenu.js";
 import { VictoryState } from "./state/victory.js";
 import { GameState } from "./state/game.js";
 import { LobbyState } from "./state/lobby.js";
-import { ServerEvents, ClientEvents } from "../game/util.js";
+import { ServerEvents, ClientEvents } from "../game/events.js";
 import { io, Socket } from "socket.io-client";
 
 (async () => {
