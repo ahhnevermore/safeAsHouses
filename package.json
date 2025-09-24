@@ -3,16 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "A browser-based board game with cards, backend in Node.js, communication via Socket.IO.",
-  "scripts": {
-    "dev:server"  : "set DEBUG=socket.io:*,socket.io-parser && tsc && node dist/server/gameserver.js",
-    "dev:client"  : "vite build --watch",
-    "dev"         : "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build:client": "vite build",
-    "build:server": "tsc",
-    "build"       : "npm run build:client && npm run build:server",
-    "start"       : "npm run build && node dist/server/gameserver.js",
-    "start:debug" : "set DEBUG=socket.io:* && npm run build && node dist/server/gameserver.js"
-  },
+  "scripts": {"dev": "set DEBUG=socket.io:*,socket.io-parser && npm run build && node dist/server/gameserver.js", "start": "npm run build && node dist/server/gameserver.js", "build:client": "vite build", "build:server": "tsc", "build": "npm run build:client && npm run build:server"},
   "dependencies": {"dotenv": "^16.5.0", "express": "^4.18.2", "pixi.js": "^8.10.1", "socket.io": "^4.5.4", "socket.io-client": "^4.8.1"},
   "devDependencies": {"@eslint/js": "^9.34.0", "@types/express": "^5.0.3", "@types/socket.io": "^3.0.1", "@types/winston": "^2.4.4", "concurrently": "^9.2.1", "prettier": "^3.6.2", "ts-node": "^10.9.2", "typescript": "^5.9.2", "vite": "^6.3.5"}
 }

@@ -68,7 +68,10 @@ export class StateManager {
       this.changeState(ClientState.Lobby, { currentPlayers: numPlayers })
     );
 
-    socket.on("gameStart", () => this.changeState(ClientState.Game));
+    socket.on("gameStart", (playerDTOs, selfDTO) => {
+      this.changeState(ClientState.Game);
+      this.game.initializeGame(playerDTOs, selfDTO);
+    });
 
     socket.on("yourTurn", (publicID, duration) => {
       this.game.updateMyTurn(true, publicID, duration);

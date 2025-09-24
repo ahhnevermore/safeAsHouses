@@ -2,6 +2,7 @@ export class playerDTO {
   id: string = "";
   name: string = "Guest";
   handSize: number = 0;
+  colour?: number;
 }
 
 export class selfDTO {
