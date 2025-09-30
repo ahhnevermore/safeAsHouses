@@ -37,6 +37,8 @@ export class Player {
       id: this.publicID,
       name: this.name,
       handSize: this.hand.length,
+      coins: this.coins,
+      territory: 1,
     };
   }
 
@@ -44,7 +46,6 @@ export class Player {
     return {
       id: this.publicID,
       name: this.name,
-      coins: this.coins,
       hand: this.hand.map((card) => card.toKey()),
     };
   }

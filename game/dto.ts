@@ -3,11 +3,12 @@ export class playerDTO {
   name: string = "Guest";
   handSize: number = 0;
   colour?: number;
+  territory: number = 1;
+  coins: number = 0;
 }
 
 export class selfDTO {
   id: string = "";
   name: string = "Guest";
-  coins: number = 0;
   hand: string[] = [];
 }
