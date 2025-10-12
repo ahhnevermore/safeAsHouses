@@ -5,7 +5,6 @@ import { Deck } from "./deck.js";
 import { Player } from "./player.js";
 import { Server as IOServer, Socket as IOSocket } from "socket.io";
 import { EventEmitter } from "events";
-import { error } from "console";
 import { Logger } from "winston";
 import { Unit } from "./unit.js";
 

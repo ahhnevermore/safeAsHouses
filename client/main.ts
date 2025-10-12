@@ -16,6 +16,8 @@ import { loadAssets } from "./src/loader.js";
     width: DESIGN_WIDTH,
     height: DESIGN_HEIGHT,
     backgroundColor: 0x222222,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
   });
 
   document.body.appendChild(app.canvas);
