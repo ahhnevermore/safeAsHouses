@@ -1,5 +1,7 @@
 import * as PIXI from "pixi.js";
-import { BASE_TILE_ALPHA, OVERLAY_TILE_ALPHA } from "./game.js";
+
+const BASE_TILE_ALPHA: number = 0.5;
+const OVERLAY_TILE_ALPHA: number = 0.7;
 
 export class BoardTile extends PIXI.Container {
   base: PIXI.Sprite;
