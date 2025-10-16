@@ -1,4 +1,5 @@
 import * as PIXI from "pixi.js";
+import { BTN_HEIGHT, BTN_WIDTH } from "./game.js";
 
 export interface UIButtonOptions {
   text: string;
@@ -21,8 +22,8 @@ export class UIButton extends PIXI.Container {
   constructor({
     text,
     color = 0x4bfa82,
-    width = 100,
-    height = 30,
+    width = BTN_WIDTH,
+    height = BTN_HEIGHT,
     iconTexture,
     onClick = () => {},
     disabled = false,
@@ -49,7 +50,7 @@ export class UIButton extends PIXI.Container {
     // btnText
     this.btnText = new PIXI.Text({
       text,
-      style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 12, fontWeight: "bold" },
     });
     this.btnText.anchor.set(0.5);
     this.btnText.x = width / 2 + (this.icon ? height / 4 : 0);

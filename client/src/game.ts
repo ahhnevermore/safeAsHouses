@@ -6,6 +6,7 @@ import { playerDTO, selfDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
 import { BoardTile } from "./boardTile.js";
 import { UIButton } from "./uibutton.js";
+import { suitShapeMap, UICard } from "./uicard.js";
 
 const PLAYER_COLOURS: number[] = [0x05d9fa, 0xdde00d, 0xe902fa, 0xfa5502];
 const HUD_WIDTH: number = 560;
@@ -19,15 +20,17 @@ const HUD_INLAY: number = 0x164b27;
 const HUD_INLAY2: number = 0x18532b;
 const HUD_GREY: number = 0x383d3a;
 const BTN_GREY: number = 0x626a65;
-const BUY_BTN: number = 0xc4ab08;
-const ADD_TILE_BTN: number = 0x44bf0b;
-const CALL_BTN: number = 0x085687;
+const CALL_BTN: number = 0xf5aa42;
 const RAISE_BTN: number = 0xc41910;
 const ALL_IN_BTN: number = 0x240302;
-const SUBMIT_BTN: number = BUY_BTN;
-const END_TURN_BTN: number = ADD_TILE_BTN;
-const BTN_HEIGHT = 30;
-const BTN_WIDTH = 100;
+const MOVE_BTN: number = 0x085687;
+const BUY_BTN: number = CALL_BTN;
+const ADD_TILE_BTN: number = 0x44bf0b;
+const SUBMIT_BTN: number = CALL_BTN;
+const END_TURN_BTN: number = RAISE_BTN;
+
+export const BTN_HEIGHT = 30;
+export const BTN_WIDTH = 100;
 
 const tdp_BoxWidth = 280;
 const tdp_BoxHeight = 240;
@@ -50,6 +53,7 @@ export class GameState implements IState {
   playerList: playerDTO[] = [];
   selfState: selfDTO | null = null;
   territory: Record<string, Set<string>> = {};
+  handCards: UICard[] = [];
 
   playerTurnHighlight: PIXI.Graphics;
   statLabels: Record<string, PIXI.Text[]> = {};
@@ -134,6 +138,7 @@ export class GameState implements IState {
     this.setupTileDisplay();
     this.setupHandDisplay();
     this.setupPlayerBases();
+    this.updateHandDisplay(selfDTO.hand);
   }
 
   setupPlayerBases() {
@@ -228,16 +233,19 @@ export class GameState implements IState {
       this.tileDisplayContainer.addChild(box);
       this.playerTileDisplays[pl.id] = box;
     });
+    const moveBtn = new UIButton({ text: "Move", color: MOVE_BTN });
+    moveBtn.position.set(0, 480);
+
     const callBtn = new UIButton({ text: "Call", color: CALL_BTN });
-    callBtn.position.set(2 * BTN_WIDTH, 480);
+    callBtn.position.set(BTN_WIDTH, 480);
 
     const raiseBtn = new UIButton({ text: "Raise", color: RAISE_BTN });
-    raiseBtn.position.set(BTN_WIDTH, 480);
+    raiseBtn.position.set(2 * BTN_WIDTH, 480);
 
     const allInBtn = new UIButton({ text: "All In", color: ALL_IN_BTN });
-    allInBtn.position.set(0, 480);
+    allInBtn.position.set(4 * BTN_WIDTH, 480);
 
-    this.tileDisplayContainer.addChild(callBtn, raiseBtn, allInBtn);
+    this.tileDisplayContainer.addChild(moveBtn, callBtn, raiseBtn, allInBtn);
 
     const tileLabel = new PIXI.Text({
       text: "0,0",
@@ -266,14 +274,14 @@ export class GameState implements IState {
     const startX = (HUD_WIDTH - (cardWidth * 6 + spacing * 5)) / 2;
 
     for (let i = 0; i < 6; i++) {
-      const card = new PIXI.Graphics()
-        .roundRect(0, 0, cardWidth, cardHeight, 8)
-        .fill({ color: 0xffffff, alpha: 0.2 })
-        .stroke({ color: 0xffffff, width: 2 });
+      const card = new UICard(cardWidth, cardHeight);
       card.x = startX + i * (cardWidth + spacing);
       card.y = 0;
       this.handDisplayContainer.addChild(card);
+      this.handCards.push(card);
     }
+
+    // buttons
     const cardY = HUD_HEIGHT - hdp_MarginY - BTN_HEIGHT;
     const buyBtn = new UIButton({ text: "Buy Card", color: BUY_BTN });
     buyBtn.position.set(BTN_WIDTH, cardY);
@@ -282,6 +290,29 @@ export class GameState implements IState {
     addBtn.position.set(0, cardY);
 
     this.handDisplayContainer.addChild(buyBtn, addBtn);
+  }
+
+  updateHandDisplay(handKeys: Array<string | null>) {
+    for (let i = 0; i < this.handCards.length; i++) {
+      const displayCard = this.handCards[i];
+      const key = handKeys[i];
+
+      if (!key) {
+        displayCard.hide();
+        continue;
+      }
+
+      // deserialize
+      const [suitStr = "0", rankStr = "0"] = key.split(",");
+      const suit = parseInt(suitStr, 10);
+      const rank = parseInt(rankStr, 10);
+
+      // map suit to shape
+      const shape = suitShapeMap[suit] ?? "circle";
+
+      // show card
+      displayCard.show(rank.toString(), shape);
+    }
   }
 
   enter() {}

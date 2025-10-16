@@ -7,6 +7,7 @@ export const CARD_PRICE: number = 1;
 export const PLAYER_COUNT: number = 4;
 export const RIVERS: string[] = ["4,4"];
 export const BASES: string[] = ["0,0", "0,8", "8,0", "8,8"];
+export const REG_HAND_SIZE: number = 5;
 
 export enum Suit {
   Black = 0,
