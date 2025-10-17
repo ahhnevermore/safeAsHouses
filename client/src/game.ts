@@ -1,12 +1,12 @@
 import * as PIXI from "pixi.js";
 import { IState, StateManager } from "./stateManager.js";
 import { Manager } from "socket.io-client";
-import { BASES, BOARD_SIZE, ClientState, TILE_COINS, Vec2 } from "../../game/util.js";
+import { BASES, BOARD_SIZE, Card, ClientState, TILE_COINS, Vec2 } from "../../game/util.js";
 import { playerDTO, selfDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
 import { BoardTile } from "./boardTile.js";
 import { UIButton } from "./uibutton.js";
-import { suitShapeMap, UICard } from "./uicard.js";
+import { UICard } from "./uicard.js";
 
 const PLAYER_COLOURS: number[] = [0x05d9fa, 0xdde00d, 0xe902fa, 0xfa5502];
 const HUD_WIDTH: number = 560;
@@ -274,7 +274,7 @@ export class GameState implements IState {
     const startX = (HUD_WIDTH - (cardWidth * 6 + spacing * 5)) / 2;
 
     for (let i = 0; i < 6; i++) {
-      const card = new UICard(cardWidth, cardHeight);
+      const card = new UICard(cardWidth, cardHeight, 35);
       card.x = startX + i * (cardWidth + spacing);
       card.y = 0;
       this.handDisplayContainer.addChild(card);
@@ -301,17 +301,9 @@ export class GameState implements IState {
         displayCard.hide();
         continue;
       }
+      const card = Card.fromKey(key);
 
-      // deserialize
-      const [suitStr = "0", rankStr = "0"] = key.split(",");
-      const suit = parseInt(suitStr, 10);
-      const rank = parseInt(rankStr, 10);
-
-      // map suit to shape
-      const shape = suitShapeMap[suit] ?? "circle";
-
-      // show card
-      displayCard.show(rank.toString(), shape);
+      displayCard.show(card.suit, card.rank);
     }
   }
 

@@ -10,10 +10,10 @@ export const BASES: string[] = ["0,0", "0,8", "8,0", "8,8"];
 export const REG_HAND_SIZE: number = 5;
 
 export enum Suit {
-  Black = 0,
-  Red = 1,
-  Green = 2,
-  Blue = 3,
+  Spades = 0,
+  Hearts = 1,
+  Diamonds = 2,
+  Clubs = 3,
 }
 
 export enum Rank {

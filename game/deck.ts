@@ -6,10 +6,10 @@ export class Deck {
   discards: Card[] = [];
 
   constructor() {
-    const colours = [Suit.Black, Suit.Red, Suit.Green, Suit.Blue];
-    for (const colour of colours) {
-      for (let value = 1; value <= 13; value++) {
-        this.cards.push(new Card(colour, value));
+    const suits = [Suit.Spades, Suit.Hearts, Suit.Diamonds, Suit.Clubs];
+    for (const suit of suits) {
+      for (let rank = 1; rank <= 13; rank++) {
+        this.cards.push(new Card(suit, rank));
       }
     }
     this.shuffle();

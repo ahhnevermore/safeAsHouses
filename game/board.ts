@@ -164,7 +164,7 @@ export class Board {
           for (let i = 0; i < incomeMods.length; i++) {
             const card = incomeMods[i];
             if (card) {
-              if (card.suit == Suit.Green && card.rank == Rank.King && kingCount < 1) {
+              if (card.rank == Rank.King && kingCount < 1) {
                 kingCount++;
                 const square = xy.getValidSquare(KING_RADIUS);
 

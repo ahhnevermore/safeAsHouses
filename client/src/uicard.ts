@@ -1,103 +1,80 @@
 import * as PIXI from "pixi.js";
+import { Rank, Suit } from "../../game/util.js";
 
-export const suitShapeMap: Record<number, keyof UICard["shapes"]> = {
-  0: "circle",
-  1: "diamond",
-  2: "triangle",
-  3: "square",
+const suitInfo = {
+  [Suit.Spades]: { symbol: "♠", color: 0x000000 },
+  [Suit.Hearts]: { symbol: "♥", color: 0xff0000 },
+  [Suit.Diamonds]: { symbol: "♦", color: 0xff0000 },
+  [Suit.Clubs]: { symbol: "♣", color: 0x000000 },
+} as const;
+
+function getSuitInfo(suit: Suit) {
+  return suitInfo[suit];
+}
+
+const rankDisplayMap: Record<Rank, string> = {
+  [Rank.Ace]: "A",
+  [Rank.Jack]: "J",
+  [Rank.Queen]: "Q",
+  [Rank.King]: "K",
+  [Rank.r2]: "2",
+  [Rank.r3]: "3",
+  [Rank.r4]: "4",
+  [Rank.r5]: "5",
+  [Rank.r6]: "6",
+  [Rank.r7]: "7",
+  [Rank.r8]: "8",
+  [Rank.r9]: "9",
+  [Rank.r10]: "10",
 };
 
-const rankDisplayMap: Record<number, string> = {
-  1: "A",
-  11: "J",
-  12: "Q",
-  13: "K",
-};
-const RED: number = 0xd32f2f;
-const BLUE: number = 0x1976d2;
-const ORANGE: number = 0xf57c00;
-const GREY: number = 0x212121;
 export class UICard extends PIXI.Container {
   public face: PIXI.Container;
-  public shapes: {
-    circle: PIXI.Graphics;
-    diamond: PIXI.Graphics;
-    triangle: PIXI.Graphics;
-    square: PIXI.Graphics;
-  };
   public cardLabel: PIXI.Text;
 
-  constructor(cardWidth: number, cardHeight: number) {
+  constructor(cardWidth: number, cardHeight: number, fontsize: number) {
     super();
 
     // --- face container
     this.face = new PIXI.Container();
     this.addChild(this.face);
-    this.face.visible = false; // start hidden
+    this.face.visible = false;
 
     // --- background
     const bg = new PIXI.Graphics()
-      .roundRect(0, 0, cardWidth, cardHeight, 4)
+      .roundRect(0, 0, cardWidth, cardHeight, 6)
       .fill({ color: 0xffffff })
       .stroke({ color: 0x000000, width: 2 });
     this.face.addChild(bg);
 
-    // --- small shapes
-    const shapeX = cardWidth / 4;
-    const shapeY = cardHeight / 5;
-    const shapeSize = 8;
-
-    const circle = new PIXI.Graphics().circle(shapeX, shapeY, shapeSize).fill({ color: RED });
-
-    const diamond = new PIXI.Graphics()
-      .poly([0, -shapeSize, shapeSize, 0, 0, shapeSize, -shapeSize, 0])
-      .fill({ color: BLUE });
-    diamond.position.set(shapeX, shapeY);
-
-    const triangle = new PIXI.Graphics()
-      .poly([0, -shapeSize, shapeSize, shapeSize, -shapeSize, shapeSize])
-      .fill({ color: ORANGE });
-    triangle.position.set(shapeX, shapeY);
-
-    const rectScaledSize = shapeSize * 0.7;
-    const square = new PIXI.Graphics()
-      .rect(-rectScaledSize * 0, -rectScaledSize, rectScaledSize * 2, rectScaledSize * 2)
-      .fill({ color: GREY });
-    square.position.set(shapeX, shapeY);
-
-    this.shapes = { circle, diamond, triangle, square };
-    this.face.addChild(circle, diamond, triangle, square);
-
-    // --- label text
+    // --- label (centered)
     this.cardLabel = new PIXI.Text({
       text: "card",
       style: {
-        fontSize: 20,
+        fontSize: fontsize,
         fill: 0x000000,
-        fontFamily: "Arial",
+        fontFamily: "Courier",
+        fontWeight: "bold",
       },
     });
+    this.cardLabel.anchor.set(0.5);
     this.cardLabel.position.set(cardWidth / 2, cardHeight / 2);
     this.face.addChild(this.cardLabel);
   }
 
-  public show(rank: number | string, shape: keyof UICard["shapes"]) {
+  public show(suit: Suit, rank: Rank) {
     this.face.visible = true;
 
-    // Convert string to number if necessary
-    const numericRank = typeof rank === "string" ? parseInt(rank, 10) : rank;
+    const { symbol, color } = getSuitInfo(suit);
 
-    const displayRank = rankDisplayMap[numericRank] ?? numericRank.toString();
+    // Convert rank to display label
+    const rankText =
+      rankDisplayMap[rank] ?? (rank >= Rank.r2 && rank <= Rank.r10 ? rank.toString() : "?");
 
-    this.cardLabel.text = displayRank;
-
-    // Toggle shapes
-    for (const key in this.shapes) {
-      this.shapes[key as keyof UICard["shapes"]].visible = key === shape;
-    }
+    this.cardLabel.text = `${rankText}${symbol}`;
+    this.cardLabel.style.fill = color;
   }
 
-  /** Hide this card */
   public hide() {
     this.face.visible = false;
   }
