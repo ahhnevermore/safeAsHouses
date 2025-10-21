@@ -147,9 +147,8 @@ export class Room extends EventEmitter {
         this.sendRoom("dcPlayer", dcPlayer.publicID);
         if (this.isPlayerTurn(socket.id)) {
           this.advanceTurn();
-        } else {
-          this.activeIndex--;
         }
+        this.activeIndex--;
         this.players = this.players.filter((player) => player.id != socket.id);
         this.logger.info("A user disconnected:", socket.id);
       }
