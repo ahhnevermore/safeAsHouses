@@ -1,19 +1,20 @@
+import { ID, unitID } from "./types.js";
 import { Unit } from "./unit.js";
 import { Card, Scope, type Structure } from "./util.js";
 
 export class Tile {
-  owner: string | null = null;
-  units: Record<string, Unit[]> = {};
-  bets: Record<string, number> = {};
+  owner: ID | null = null;
+  units: Partial<Record<string, Unit[]>> = {};
+  bets: Partial<Record<string, number>> = {};
   structures: Structure[] = [];
 
   constructor() {}
 
   placeUnit(
     unit: Unit,
-    playerID: string,
+    playerID: ID,
     bet: number
-  ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: number] {
+  ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: unitID] {
     var territoryCaptured = false;
     var success = false;
     var unitSwallowed = false;

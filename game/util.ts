@@ -1,8 +1,10 @@
+import { cardID, coins } from "./types.js";
+
 export const BOARD_SIZE: number = 9;
 export const REG_MOVE: number = 1;
 export const ACE_MOVE: number = 2;
 export const KING_RADIUS: number = 2;
-export const TILE_COINS: number = 0.1;
+export const TILE_COINS: coins = 0.1 as coins;
 export const CARD_PRICE: number = 1;
 export const PLAYER_COUNT: number = 4;
 export const RIVERS: string[] = ["4,4"];
@@ -94,13 +96,13 @@ export class Card {
     this.rank = rank;
   }
 
-  static fromKey(key: string): Card {
+  static fromKey(key: cardID): Card {
     const [suit = "0", rank = "0"] = key.split(",");
     return new Card(parseInt(suit, 10), parseInt(rank, 10));
   }
 
-  toKey(): string {
-    return `${this.suit},${this.rank}`;
+  toKey(): cardID {
+    return `${this.suit},${this.rank}` as cardID;
   }
 }
 

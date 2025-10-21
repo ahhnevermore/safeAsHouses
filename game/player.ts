@@ -1,14 +1,14 @@
 import { Card, CARD_PRICE } from "./util.js";
-import { Deck } from "./deck.js";
 import { playerDTO, selfDTO } from "./dto.js";
+import { ID, publicID } from "./types.js";
 
 export class Player {
-  id: string;
-  publicID: string;
+  id: ID;
+  publicID: publicID;
   name: string;
   coins: number = 10;
   hand: Card[] = [];
-  constructor(id: string, name: string, pubID: string) {
+  constructor(id: ID, name: string, pubID: publicID) {
     this.id = id;
     this.name = name;
     this.publicID = pubID;

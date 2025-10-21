@@ -1,14 +1,16 @@
+import { cardID, colour, publicID } from "./types.js";
+
 export class playerDTO {
-  id: string = "";
+  id: publicID = "" as publicID;
   name: string = "Guest";
   handSize: number = 0;
-  colour?: number;
+  colour?: colour;
   territory: number = 1;
   coins: number = 0;
 }
 
 export class selfDTO {
-  id: string = "";
+  id: publicID = "" as publicID;
   name: string = "Guest";
-  hand: string[] = [];
+  hand: cardID[] = [];
 }

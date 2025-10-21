@@ -4,30 +4,42 @@ import { Manager } from "socket.io-client";
 import { BASES, BOARD_SIZE, Card, ClientState, TILE_COINS, Vec2 } from "../../game/util.js";
 import { playerDTO, selfDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
-import { BoardTile } from "./boardTile.js";
+import { BoardTile, Layer } from "./boardTile.js";
 import { UIButton } from "./uibutton.js";
 import { UICard } from "./uicard.js";
+import { cardID, colour, publicID } from "../../game/types.js";
 
-const PLAYER_COLOURS: number[] = [0x05d9fa, 0xdde00d, 0xe902fa, 0xfa5502];
+enum ActiveAction {
+  None = 0,
+  Select = 1,
+  Move = 2,
+}
+
+const PLAYER_COLOURS: colour[] = [
+  0x05d9fa as colour,
+  0xdde00d as colour,
+  0xe902fa as colour,
+  0xfa5502 as colour,
+];
 const HUD_WIDTH: number = 560;
 const HUD_HEIGHT: number = 720;
 const BOARD_WIDTH: number = 720;
 const BOARD_HEIGHT: number = 720;
 const BACKGROUND_ALPHA: number = 0.4;
-const HUD_BACKGROUND: number = 0x134021;
-const HUD_HIGHLIGHT: number = 0x4bfa82;
-const HUD_INLAY: number = 0x164b27;
-const HUD_INLAY2: number = 0x18532b;
-const HUD_GREY: number = 0x383d3a;
-const BTN_GREY: number = 0x626a65;
-const CALL_BTN: number = 0xf5aa42;
-const RAISE_BTN: number = 0xc41910;
-const ALL_IN_BTN: number = 0x240302;
-const MOVE_BTN: number = 0x085687;
-const BUY_BTN: number = CALL_BTN;
-const ADD_TILE_BTN: number = 0x44bf0b;
-const SUBMIT_BTN: number = CALL_BTN;
-const END_TURN_BTN: number = RAISE_BTN;
+const HUD_BACKGROUND: colour = 0x134021 as colour;
+const HUD_HIGHLIGHT: colour = 0x4bfa82 as colour;
+const HUD_INLAY: colour = 0x164b27 as colour;
+const HUD_INLAY2: colour = 0x18532b as colour;
+const HUD_GREY: colour = 0x383d3a as colour;
+const BTN_GREY: colour = 0x626a65 as colour;
+const CALL_BTN: colour = 0xf5aa42 as colour;
+const RAISE_BTN: colour = 0xc41910 as colour;
+const ALL_IN_BTN: colour = 0x240302 as colour;
+const MOVE_BTN: colour = 0x085687 as colour;
+const BUY_BTN: colour = CALL_BTN;
+const ADD_TILE_BTN: colour = 0x44bf0b as colour;
+const SUBMIT_BTN: colour = CALL_BTN;
+const END_TURN_BTN: colour = RAISE_BTN;
 
 export const BTN_HEIGHT = 30;
 export const BTN_WIDTH = 100;
@@ -43,29 +55,48 @@ const playerStatPrefix = "playerStat_";
 
 const TILE_SIZE = BOARD_WIDTH / BOARD_SIZE;
 export class GameState implements IState {
-  container = new PIXI.Container();
   manager: StateManager;
-  myTurn: boolean = false;
-  duration: number = 0;
-  activePlayerID: string = "";
-  players: string[] = [];
+  container = new PIXI.Container();
   hud: PIXI.Container;
-  playerList: playerDTO[] = [];
-  selfState: selfDTO | null = null;
-  territory: Record<string, Set<string>> = {};
-  handCards: UICard[] = [];
-
-  playerTurnHighlight: PIXI.Graphics;
-  statLabels: Record<string, PIXI.Text[]> = {};
-  tiles: BoardTile[][] = [];
   tileDisplayContainer: PIXI.Container;
   handDisplayContainer: PIXI.Container;
-  playerTileDisplays: Record<string, PIXI.Container> = {};
+
+  model: {
+    myTurn: boolean;
+    timeLeft: number;
+    actPlayerID: publicID;
+    players: playerDTO[];
+    self: selfDTO | null;
+    territory: Partial<Record<publicID, Set<string>>>;
+    actAction: ActiveAction;
+  } = {
+    myTurn: false,
+    timeLeft: 0,
+    actPlayerID: "" as publicID,
+    players: [],
+    self: null,
+    territory: {},
+    actAction: ActiveAction.None,
+  };
+
+  mainUI: {
+    tiles: BoardTile[][];
+    playerHighlight: PIXI.Graphics | null;
+    selTile: BoardTile | null;
+  } = { tiles: [], selTile: null, playerHighlight: null };
+
+  handUI: {
+    cards: UICard[];
+  } = { cards: [] };
+
+  tileUI: {
+    stats: Record<string, PIXI.Text[]>;
+    actTile: PIXI.Text | null;
+    playerDisplays: Partial<Record<string, PIXI.Container>>;
+  } = { stats: {}, actTile: null, playerDisplays: {} };
 
   constructor(stateManager: StateManager) {
     this.manager = stateManager;
-
-    // Board placeholder
 
     const board = new PIXI.Sprite(PIXI.Texture.from(ASSETS.gameBoard));
     this.container.addChild(board);
@@ -78,13 +109,13 @@ export class GameState implements IState {
     this.hud.addChild(hudBG);
     this.container.addChild(this.hud);
 
-    this.tiles = Array.from({ length: BOARD_SIZE }, (_, y) =>
+    this.mainUI.tiles = Array.from({ length: BOARD_SIZE }, (_, y) =>
       Array.from({ length: BOARD_SIZE }, (_, x) => {
         const tile = new BoardTile(x, y, TILE_SIZE);
         this.container.addChild(tile);
 
         // Listen for clicks directly
-        tile.on("tileClicked", (t: BoardTile) => this.onTileClicked(t));
+        tile.on("clicked", (t: BoardTile) => this.onTileClicked(t));
 
         return tile;
       })
@@ -92,12 +123,12 @@ export class GameState implements IState {
 
     const submitButton = new UIButton({
       text: "Submit Turn",
-      color: SUBMIT_BTN,
+      colour: SUBMIT_BTN,
     });
     submitButton.position.set(BOARD_WIDTH + HUD_WIDTH - 2 * BTN_WIDTH, 0);
     const endTurnButton = new UIButton({
       text: "Vote End",
-      color: END_TURN_BTN,
+      colour: END_TURN_BTN,
     });
     endTurnButton.position.set(BOARD_WIDTH + HUD_WIDTH - BTN_WIDTH, 0);
     this.hud.addChild(submitButton, endTurnButton);
@@ -110,43 +141,56 @@ export class GameState implements IState {
     this.handDisplayContainer.position.set(BOARD_WIDTH, hdp_MarginY);
     this.hud.addChild(this.handDisplayContainer);
 
-    this.playerTurnHighlight = new PIXI.Graphics()
+    this.mainUI.playerHighlight = new PIXI.Graphics()
       .rect(0, 0, tdp_BoxWidth, tdp_HeaderHeight)
       .stroke({ color: HUD_HIGHLIGHT, width: 2 });
-    this.hud.addChild(this.playerTurnHighlight);
+    this.hud.addChild(this.mainUI.playerHighlight);
   }
 
-  onTileClicked(tile: BoardTile) {}
+  onTileClicked(tile: BoardTile) {
+    switch (this.model.actAction) {
+      default: {
+        if (this.mainUI.selTile) {
+          this.mainUI.selTile.clearLayer(Layer.Select);
+        }
+        this.mainUI.selTile = tile;
+        this.mainUI.selTile.setLayer(Layer.Select);
+        if (this.tileUI.actTile) {
+          this.tileUI.actTile.text = `${tile.xIndex},${tile.yIndex}`;
+        }
+      }
+    }
+  }
 
-  updateMyTurn(myTurn: boolean, publicID: string, duration: number) {
-    this.myTurn = myTurn;
-    this.duration = duration;
-    this.activePlayerID = publicID;
-    const activeIndex = this.playerList.findIndex((pl) => pl.id == publicID);
-    const col = activeIndex % 2;
-    const row = Math.floor(activeIndex / 2);
+  updateMyTurn(myTurn: boolean, publicID: publicID, duration: number) {
+    this.model.myTurn = myTurn;
+    this.model.timeLeft = duration;
+    this.model.actPlayerID = publicID;
+    const actIndex = this.model.players.findIndex((pl) => pl.id == publicID);
+    const col = actIndex % 2;
+    const row = Math.floor(actIndex / 2);
 
-    this.playerTurnHighlight.position.set(
+    this.mainUI.playerHighlight?.position.set(
       BOARD_WIDTH + col * tdp_BoxWidth,
       tdp_MarginY + row * tdp_BoxHeight
     );
   }
 
   initializeGame(playerDTOs: playerDTO[], selfDTO: selfDTO) {
-    this.playerList = playerDTOs;
-    this.selfState = selfDTO;
+    this.model.players = playerDTOs;
+    this.model.self = selfDTO;
     this.setupTileDisplay();
     this.setupHandDisplay();
     this.setupPlayerBases();
     this.updateHandDisplay(selfDTO.hand);
+    this.onTileClicked(this.mainUI.tiles[0][0]);
   }
 
   setupPlayerBases() {
-    this.playerList.forEach((pl, i) => {
+    this.model.players.forEach((pl, i) => {
       const tileVec = Vec2.fromKey(BASES[i]);
-      this.territory[pl.id] = new Set<string>();
-      this.territory[pl.id].add(BASES[i]);
-      this.tiles[tileVec.x][tileVec.y].setColor(pl.colour ?? 0xfffff);
+      this.model.territory[pl.id] = new Set<string>([BASES[i]]);
+      this.mainUI.tiles[tileVec.x][tileVec.y].setLayer(Layer.Base, pl.colour);
       const baseSprite = new PIXI.Sprite(PIXI.Texture.from(ASSETS.castleIcon));
       this.container.addChild(baseSprite);
       [baseSprite.x, baseSprite.y] = boardToWorld(tileVec.x, tileVec.y);
@@ -157,7 +201,7 @@ export class GameState implements IState {
   }
 
   setupTileDisplay() {
-    this.playerList.forEach((pl, i) => {
+    this.model.players.forEach((pl, i) => {
       pl.colour = PLAYER_COLOURS[i];
       const box = new PIXI.Container();
       const bg = new PIXI.Graphics()
@@ -165,55 +209,8 @@ export class GameState implements IState {
         .fill({ color: [1, 2].includes(i) ? HUD_INLAY : HUD_INLAY2 });
       box.addChild(bg);
 
-      const header = new PIXI.Graphics()
-        .rect(0, 0, tdp_TagWidth, tdp_HeaderHeight)
-        .fill({ color: pl.colour ?? 0xffffff })
-        .rect(tdp_TagWidth, 0, tdp_BoxWidth - tdp_TagWidth, tdp_HeaderHeight)
-        .fill({ color: HUD_GREY });
+      const header = this.createPlayerHeader(pl);
       box.addChild(header);
-
-      if (this.selfState) {
-        if (pl.id == this.selfState?.id) {
-          const sprite = new PIXI.Sprite(PIXI.Texture.from(ASSETS.crown));
-          sprite.x = tdp_TagWidth / 2;
-          sprite.y = tdp_HeaderHeight / 2;
-          sprite.scale.set(0.009);
-          sprite.anchor.set(0.5);
-          header.addChild(sprite);
-        }
-      }
-
-      const iconPaths = [ASSETS.cardsIcon, ASSETS.castleIcon, ASSETS.coinsIcon];
-      const iconScales = [0.5, 0.5, 0.5];
-      const iconYInc = [2, 2, 2];
-      const iconX = [135, 180, 225];
-      const labelX = [160, 205, 250];
-      for (let i = 0; i < 3; i++) {
-        const icon = new PIXI.Sprite(PIXI.Texture.from(iconPaths[i]));
-        icon.scale.set(iconScales[i]);
-        header.addChild(icon);
-        icon.x = iconX[i];
-        icon.y += iconYInc[i];
-
-        const statLabel = new PIXI.Text({
-          text: "0",
-          style: {
-            fill: 0xffffff,
-            fontSize: 14,
-            fontWeight: "bold",
-          },
-        });
-        statLabel.x = labelX[i];
-        statLabel.y = 10;
-        statLabel.anchor.set(0, 0.5);
-        statLabel.label = playerStatPrefix + i;
-        if (!this.statLabels[pl.id]) {
-          this.statLabels[pl.id] = [];
-        }
-        this.statLabels[pl.id].push(statLabel);
-        header.addChild(statLabel);
-      }
-
       this.updatePlayerHeader(i);
 
       const nameLabel = new PIXI.Text({
@@ -231,39 +228,86 @@ export class GameState implements IState {
       box.y = row * tdp_BoxHeight;
 
       this.tileDisplayContainer.addChild(box);
-      this.playerTileDisplays[pl.id] = box;
+      this.tileUI.playerDisplays[pl.id] = box;
     });
-    const moveBtn = new UIButton({ text: "Move", color: MOVE_BTN });
+    const moveBtn = new UIButton({ text: "Move", colour: MOVE_BTN });
     moveBtn.position.set(0, 480);
 
-    const callBtn = new UIButton({ text: "Call", color: CALL_BTN });
+    const callBtn = new UIButton({ text: "Call", colour: CALL_BTN });
     callBtn.position.set(BTN_WIDTH, 480);
 
-    const raiseBtn = new UIButton({ text: "Raise", color: RAISE_BTN });
+    const raiseBtn = new UIButton({ text: "Raise", colour: RAISE_BTN });
     raiseBtn.position.set(2 * BTN_WIDTH, 480);
 
-    const allInBtn = new UIButton({ text: "All In", color: ALL_IN_BTN });
+    const allInBtn = new UIButton({ text: "All In", colour: ALL_IN_BTN });
     allInBtn.position.set(4 * BTN_WIDTH, 480);
 
-    this.tileDisplayContainer.addChild(moveBtn, callBtn, raiseBtn, allInBtn);
-
-    const tileLabel = new PIXI.Text({
+    this.tileUI.actTile = new PIXI.Text({
       text: "0,0",
-      style: { fill: 0xffffff, fontSize: 12, fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold" },
     });
+    this.tileUI.actTile.position.set(10, -30);
+
+    this.tileDisplayContainer.addChild(moveBtn, callBtn, raiseBtn, allInBtn, this.tileUI.actTile);
   }
 
-  updatePlayerHeader(selectedID: number) {
-    const selectedPlayer = this.playerList[selectedID];
+  createPlayerHeader(pl: playerDTO): PIXI.Graphics {
+    const header = new PIXI.Graphics()
+      .rect(0, 0, tdp_TagWidth, tdp_HeaderHeight)
+      .fill({ color: pl.colour ?? 0xffffff })
+      .rect(tdp_TagWidth, 0, tdp_BoxWidth - tdp_TagWidth, tdp_HeaderHeight)
+      .fill({ color: HUD_GREY });
 
-    const values = [
-      selectedPlayer.handSize ?? 0,
-      selectedPlayer.territory ?? 0,
-      selectedPlayer.coins ?? 0,
-    ];
+    if (this.model.self) {
+      if (pl.id == this.model.self.id) {
+        const sprite = new PIXI.Sprite(PIXI.Texture.from(ASSETS.crown));
+        sprite.x = tdp_TagWidth / 2;
+        sprite.y = tdp_HeaderHeight / 2;
+        sprite.scale.set(0.009);
+        sprite.anchor.set(0.5);
+        header.addChild(sprite);
+      }
+    }
+
+    const iconPaths = [ASSETS.cardsIcon, ASSETS.castleIcon, ASSETS.coinsIcon];
+    const iconScales = [0.5, 0.5, 0.5];
+    const iconYInc = [2, 2, 2];
+    const iconX = [135, 180, 225];
+    const labelX = [160, 205, 250];
+    for (let i = 0; i < 3; i++) {
+      const icon = new PIXI.Sprite(PIXI.Texture.from(iconPaths[i]));
+      icon.scale.set(iconScales[i]);
+      header.addChild(icon);
+      icon.x = iconX[i];
+      icon.y += iconYInc[i];
+
+      const statLabel = new PIXI.Text({
+        text: "0",
+        style: {
+          fill: 0xffffff,
+          fontSize: 14,
+          fontWeight: "bold",
+        },
+      });
+      statLabel.x = labelX[i];
+      statLabel.y = 10;
+      statLabel.anchor.set(0, 0.5);
+      statLabel.label = playerStatPrefix + i;
+      if (!this.tileUI.stats[pl.id]) {
+        this.tileUI.stats[pl.id] = [];
+      }
+      this.tileUI.stats[pl.id].push(statLabel);
+      header.addChild(statLabel);
+    }
+    return header;
+  }
+  updatePlayerHeader(selID: number) {
+    const selPlayer = this.model.players[selID];
+
+    const values = [selPlayer.handSize ?? 0, selPlayer.territory ?? 0, selPlayer.coins ?? 0];
 
     values.forEach((val, i) => {
-      this.statLabels[selectedPlayer.id][i].text = String(val);
+      this.tileUI.stats[selPlayer.id][i].text = String(val);
     });
   }
 
@@ -278,23 +322,23 @@ export class GameState implements IState {
       card.x = startX + i * (cardWidth + spacing);
       card.y = 0;
       this.handDisplayContainer.addChild(card);
-      this.handCards.push(card);
+      this.handUI.cards.push(card);
     }
 
     // buttons
     const cardY = HUD_HEIGHT - hdp_MarginY - BTN_HEIGHT;
-    const buyBtn = new UIButton({ text: "Buy Card", color: BUY_BTN });
+    const buyBtn = new UIButton({ text: "Buy Card", colour: BUY_BTN });
     buyBtn.position.set(BTN_WIDTH, cardY);
 
-    const addBtn = new UIButton({ text: "Add to Tile", color: ADD_TILE_BTN });
+    const addBtn = new UIButton({ text: "Add to Tile", colour: ADD_TILE_BTN });
     addBtn.position.set(0, cardY);
 
     this.handDisplayContainer.addChild(buyBtn, addBtn);
   }
 
-  updateHandDisplay(handKeys: Array<string | null>) {
-    for (let i = 0; i < this.handCards.length; i++) {
-      const displayCard = this.handCards[i];
+  updateHandDisplay(handKeys: Array<cardID | null>) {
+    for (let i = 0; i < this.handUI.cards.length; i++) {
+      const displayCard = this.handUI.cards[i];
       const key = handKeys[i];
 
       if (!key) {

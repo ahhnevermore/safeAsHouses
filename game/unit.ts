@@ -1,15 +1,16 @@
+import { unitID } from "./types.js";
 import type { Card } from "./util.js";
 import { Scope, Rank, Suit } from "./util.js";
 export class Unit {
   private static nextID: number = 1;
-  id: number;
+  id: unitID;
   stack: Card[] = [];
   faceup: boolean = false;
   canMove: boolean = false;
 
   constructor(card: Card) {
     this.stack.push(card);
-    this.id = Unit.nextID++;
+    this.id = Unit.nextID++ as unitID;
   }
 
   addToStack(card: Card) {

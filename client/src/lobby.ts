@@ -24,7 +24,7 @@ export class LobbyState implements IState {
   }
 
   enter(props?: Record<string, unknown>) {
-    this.setPlayers(props?.currentPlayers as number);
+    this.setPlayers(props?.actPlayers as number);
   }
   exit() {}
 }

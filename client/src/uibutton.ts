@@ -1,9 +1,10 @@
 import * as PIXI from "pixi.js";
 import { BTN_HEIGHT, BTN_WIDTH } from "./game.js";
+import { colour } from "../../game/types.js";
 
 export interface UIButtonOptions {
   text: string;
-  color?: number;
+  colour?: colour;
   width?: number;
   height?: number;
   iconTexture?: PIXI.Texture;
@@ -15,13 +16,13 @@ export class UIButton extends PIXI.Container {
   private bg: PIXI.Graphics;
   private btnText: PIXI.Text;
   private icon?: PIXI.Sprite;
-  private baseColor: number;
+  private baseColor: colour;
   private callback: () => void;
   private disabled: boolean;
 
   constructor({
     text,
-    color = 0x4bfa82,
+    colour = 0x4bfa82 as colour,
     width = BTN_WIDTH,
     height = BTN_HEIGHT,
     iconTexture,
@@ -29,7 +30,7 @@ export class UIButton extends PIXI.Container {
     disabled = false,
   }: UIButtonOptions) {
     super();
-    this.baseColor = color;
+    this.baseColor = colour;
     this.callback = onClick;
     this.disabled = disabled;
 
@@ -105,8 +106,8 @@ export class UIButton extends PIXI.Container {
     this.btnText.text = newText;
   }
 
-  public setColor(newColor: number) {
-    this.baseColor = newColor;
-    this.bg.clear().rect(0, 0, this.bg.width, this.bg.height).fill({ color: newColor });
+  public setColour(newColour: colour) {
+    this.baseColor = newColour;
+    this.bg.clear().rect(0, 0, this.bg.width, this.bg.height).fill({ color: newColour });
   }
 }

@@ -7,6 +7,7 @@ import { Server as IOServer, Socket as IOSocket } from "socket.io";
 import { EventEmitter } from "events";
 import { Logger } from "winston";
 import { Unit } from "./unit.js";
+import { cardID, coins, ID, publicID, tileID, unitID } from "./types.js";
 
 export class Room extends EventEmitter {
   private static nextID = 1;
@@ -15,7 +16,7 @@ export class Room extends EventEmitter {
   board: Board;
   id: string;
   players: Player[] = [];
-  activeIndex: number = 0;
+  actIndex: number = 0;
   turnTimer: NodeJS.Timeout | null = null;
   turnDuration: number = 30000;
 
@@ -33,7 +34,7 @@ export class Room extends EventEmitter {
   }
 
   addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
-    var player = new Player(socket.id, name, this.players.length.toString());
+    var player = new Player(socket.id as ID, name, this.players.length.toString() as publicID);
     this.players.push(player);
     this.board.territory[player.id] = new Set<string>();
 
@@ -61,15 +62,10 @@ export class Room extends EventEmitter {
 
   startTurnTimer() {
     try {
-      const currentPlayer = this.players[this.activeIndex];
+      const actPlayer = this.players[this.actIndex];
 
-      this.sendPlayer(currentPlayer.id, "yourTurn", currentPlayer.publicID, this.turnDuration);
-      this.sendOtherPlayers(
-        currentPlayer.id,
-        "waitTurn",
-        currentPlayer.publicID,
-        this.turnDuration
-      );
+      this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, this.turnDuration);
+      this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, this.turnDuration);
 
       // Clear any previous timer
       if (this.turnTimer) clearTimeout(this.turnTimer);
@@ -85,7 +81,7 @@ export class Room extends EventEmitter {
   }
 
   advanceTurn() {
-    this.activeIndex = (this.activeIndex + 1) % this.players.length;
+    this.actIndex = (this.actIndex + 1) % this.players.length;
     const winner = this.board.checkRiverWin();
     if (winner) {
       const winningPlayer = this.players.find((pl) => pl.id == winner);
@@ -93,9 +89,9 @@ export class Room extends EventEmitter {
         this.sendRoom("winner", winningPlayer.publicID);
       }
     }
-    const income = this.board.calculateIncome();
+    const income = this.board.calculateIncome(this.players.map((pl) => pl.id));
     for (const [playerID, count] of Object.entries(income)) {
-      this.sendPlayer(playerID, "income", count * TILE_COINS);
+      this.sendPlayer(playerID as ID, "income", (count * TILE_COINS) as coins);
     }
     this.startTurnTimer();
   }
@@ -114,7 +110,7 @@ export class Room extends EventEmitter {
   }
 
   sendPlayer<E extends keyof ServerEvents>(
-    playerID: string,
+    playerID: ID,
     signal: E,
     ...args: Parameters<ServerEvents[E]>
   ) {
@@ -122,7 +118,7 @@ export class Room extends EventEmitter {
   }
 
   sendOtherPlayers<E extends keyof ServerEvents>(
-    playerID: string,
+    playerID: ID,
     signal: E,
     ...args: Parameters<ServerEvents[E]>
   ) {
@@ -133,11 +129,11 @@ export class Room extends EventEmitter {
   }
 
   isPlayerTurn(playerID: string): boolean {
-    return this.players[this.activeIndex]?.id == playerID;
+    return this.players[this.actIndex]?.id == playerID;
   }
 
   getCurrPlayer(): Player | undefined {
-    return this.players[this.activeIndex];
+    return this.players[this.actIndex];
   }
 
   registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
@@ -148,7 +144,7 @@ export class Room extends EventEmitter {
         if (this.isPlayerTurn(socket.id)) {
           this.advanceTurn();
         }
-        this.activeIndex--;
+        this.actIndex--;
         this.players = this.players.filter((player) => player.id != socket.id);
         this.logger.info("A user disconnected:", socket.id);
       }
@@ -160,7 +156,7 @@ export class Room extends EventEmitter {
       }
     });
 
-    socket.on("flip", (tileID: string, unitID: number) => {
+    socket.on("flip", (tileID: tileID, unitID: unitID) => {
       const currPlayer = this.getCurrPlayer();
       if (currPlayer && currPlayer.id == socket.id) {
         if (this.board.flipUnit(socket.id, tileID, unitID)) {
@@ -169,34 +165,61 @@ export class Room extends EventEmitter {
           return;
         }
       }
-      this.sendPlayer(socket.id, "flipRej", tileID, unitID);
+      this.sendPlayer(socket.id as ID, "flipRej", tileID, unitID);
     });
 
-    socket.on("placeCard", (tileID: string, cardVal: string, bet: number) => {
+    socket.on("placeCard", (tileID: tileID, cardVal: cardID, bet: coins) => {
       const currPlayer = this.getCurrPlayer();
       if (currPlayer && currPlayer.id == socket.id && currPlayer.hasCard(cardVal)) {
         const card = Card.fromKey(cardVal);
         const unit = new Unit(card);
-        let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, socket.id, bet);
+        let [success, unitSwallowed, unitID] = this.board.placeCard(
+          tileID,
+          unit,
+          socket.id as ID,
+          bet
+        );
         if (success) {
           currPlayer.discard(cardVal);
           this.deck.addDiscard(Card.fromKey(cardVal));
           if (unitSwallowed) {
-            this.sendOtherPlayers(socket.id, "placeCardPublic", currPlayer.publicID, tileID, bet, {
-              unitID,
-              cardVal,
-            });
+            this.sendOtherPlayers(
+              socket.id as ID,
+              "placeCardPublic",
+              currPlayer.publicID,
+              tileID,
+              bet,
+              {
+                unitID: unitID,
+                cardID: cardVal,
+              }
+            );
           } else {
-            this.sendOtherPlayers(socket.id, "placeCardPublic", currPlayer.publicID, tileID, bet, {
-              unitID,
-            });
+            this.sendOtherPlayers(
+              socket.id as ID,
+              "placeCardPublic",
+              currPlayer.publicID,
+              tileID,
+              bet,
+              {
+                unitID: unitID,
+              }
+            );
           }
-          this.sendPlayer(socket.id, "placeCardAck", tileID, cardVal, bet, unitID, unitSwallowed);
+          this.sendPlayer(
+            socket.id as ID,
+            "placeCardAck",
+            tileID,
+            cardVal,
+            bet,
+            unitID,
+            unitSwallowed
+          );
           this.startTurnTimer();
           return;
         }
       }
-      this.sendPlayer(socket.id, "placeCardRej", tileID, cardVal, bet);
+      this.sendPlayer(socket.id as ID, "placeCardRej", tileID, cardVal, bet);
     });
 
     socket.on("buyCard", () => {
@@ -206,12 +229,12 @@ export class Room extends EventEmitter {
         if (card) {
           const fee = currPlayer.buyCard(card);
           this.pot += fee;
-          this.sendOtherPlayers(socket.id, "buyCardPublic", currPlayer.publicID);
-          this.sendPlayer(socket.id, "buyCardAck", card.toKey());
+          this.sendOtherPlayers(currPlayer.id, "buyCardPublic", currPlayer.publicID);
+          this.sendPlayer(currPlayer.id, "buyCardAck", card.toKey());
           return;
         }
       }
-      this.sendPlayer(socket.id, "buyCardRej");
+      this.sendPlayer(socket.id as ID, "buyCardRej");
     });
   }
 }

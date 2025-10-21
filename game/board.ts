@@ -15,6 +15,7 @@ import {
   RIVERS,
   BASES,
 } from "./util.js";
+import { coins, ID, tileID, unitID } from "./types.js";
 
 export class Board {
   grid: Tile[][] = Array.from({ length: BOARD_SIZE }, () =>
@@ -22,7 +23,7 @@ export class Board {
   );
   rivers: Vec2[] = RIVERS.map((el) => Vec2.fromKey(el));
   bases: Vec2[] = BASES.map((el) => Vec2.fromKey(el));
-  territory: Record<string, Set<string>> = {};
+  territory: Partial<Record<string, Set<string>>> = {};
 
   constructor() {
     this.rivers.forEach((elem) => this.getTile(elem.x, elem.y)?.addStructure(new River()));
@@ -36,11 +37,11 @@ export class Board {
   }
 
   placeCard(
-    tileID: string,
+    tileID: tileID,
     unit: Unit,
-    playerID: string,
+    playerID: ID,
     bet: number
-  ): [success: boolean, unitSwallowed: boolean, unitID: number] {
+  ): [success: boolean, unitSwallowed: boolean, unitID: unitID] {
     const xy = Vec2.fromKey(tileID);
     if (this.isValidPlacement(xy, playerID)) {
       const tile = this.getTile(xy.x, xy.y)!;
@@ -52,10 +53,10 @@ export class Board {
         return [success, unitSwallowed, unitID];
       }
     }
-    return [false, false, 0];
+    return [false, false, 0 as unitID];
   }
 
-  moveUnit(orig: Vec2, dest: Vec2, playerID: string, unitID: number): boolean {
+  moveUnit(orig: Vec2, dest: Vec2, playerID: ID, unitID: unitID): boolean {
     const origTile = this.getTile(orig.x, orig.y);
     if (origTile) {
       const unit = origTile.getUnit(playerID, unitID);
@@ -74,7 +75,7 @@ export class Board {
     return false;
   }
 
-  isValidPlacement(xy: Vec2, playerID: string): boolean {
+  isValidPlacement(xy: Vec2, playerID: ID): boolean {
     const square = xy.getValidSquare(REG_MOVE);
     for (let i = 0; i < square.length; i++) {
       const x = square[i]?.x;
@@ -151,30 +152,33 @@ export class Board {
     return null;
   }
 
-  calculateIncome(): Record<string, number> {
-    const res: Record<string, number> = {};
-    for (const [playerID, tiles] of Object.entries(this.territory)) {
-      res[playerID] = tiles.size;
-      tiles.forEach((tileKey) => {
-        const xy = Vec2.fromKey(tileKey);
-        const tile = this.getTile(xy.x, xy.y);
-        if (tile) {
-          const incomeMods = tile.getMods(playerID, Scope.Income);
-          var kingCount = 0;
-          for (let i = 0; i < incomeMods.length; i++) {
-            const card = incomeMods[i];
-            if (card) {
-              if (card.rank == Rank.King && kingCount < 1) {
-                kingCount++;
-                const square = xy.getValidSquare(KING_RADIUS);
-
-                res[playerID]! += square.filter((sq) => tiles.has(sq.toKey())).length;
+  calculateIncome(ids: ID[]): Record<ID, coins> {
+    const res: Record<ID, coins> = {};
+    ids.forEach((playerID) => {
+      const tiles = this.territory[playerID];
+      if (tiles) {
+        res[playerID] = tiles.size as coins;
+        tiles.forEach((tileKey) => {
+          const xy = Vec2.fromKey(tileKey);
+          const tile = this.getTile(xy.x, xy.y);
+          if (tile) {
+            const incomeMods = tile.getMods(playerID, Scope.Income);
+            var kingCount = 0;
+            for (let i = 0; i < incomeMods.length; i++) {
+              const card = incomeMods[i];
+              if (card) {
+                if (card.rank == Rank.King && kingCount < 1) {
+                  kingCount++;
+                  const square = xy.getValidSquare(KING_RADIUS);
+                  res[playerID] = (res[playerID] +
+                    square.filter((sq) => tiles.has(sq.toKey())).length) as coins;
+                }
               }
             }
           }
-        }
-      });
-    }
+        });
+      }
+    });
     return res;
   }
 
@@ -191,7 +195,7 @@ export class Board {
     return false;
   }
 
-  capture(playerID: string, tileVec: Vec2) {
+  capture(playerID: ID, tileVec: Vec2) {
     const tile = this.getTile(tileVec.x, tileVec.y);
     if (tile) {
       const prevOwner = tile.owner;

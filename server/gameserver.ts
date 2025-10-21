@@ -25,7 +25,7 @@ const io = new Server<ClientEvents, ServerEvents>(server, {
 
 app.use(express.json());
 
-let rooms: Record<string, Room> = {};
+let rooms: Partial<Record<string, Room>> = {};
 let waitingRoom: Room | null = null;
 
 io.on("connection", (socket) => {

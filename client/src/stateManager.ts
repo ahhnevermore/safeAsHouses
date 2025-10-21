@@ -16,7 +16,7 @@ export interface IState {
 export class StateManager {
   private app: PIXI.Application;
   private socket: Socket<ServerEvents, ClientEvents>;
-  private currentState: IState;
+  private actState: IState;
   mainMenu: MainMenuState;
   lobby: LobbyState;
   game: GameState;
@@ -30,14 +30,14 @@ export class StateManager {
     this.game = new GameState(this);
     this.lobby = new LobbyState(this);
     this.mainMenu = new MainMenuState(this);
-    this.currentState = this.mainMenu;
+    this.actState = this.mainMenu;
     this.changeState(ClientState.MainMenu);
   }
 
   changeState(clientState: ClientState, props?: Record<string, unknown>) {
-    if (this.currentState) {
-      this.app.stage.removeChild(this.currentState.container);
-      this.currentState.exit();
+    if (this.actState) {
+      this.app.stage.removeChild(this.actState.container);
+      this.actState.exit();
     }
     let newState: IState;
     switch (clientState) {
@@ -54,7 +54,7 @@ export class StateManager {
         newState = this.victory;
         break;
     }
-    this.currentState = newState;
+    this.actState = newState;
     this.app.stage.addChild(newState.container);
     newState.enter(props);
   }
@@ -65,7 +65,7 @@ export class StateManager {
 
   registerHandlers(socket: Socket<ServerEvents, ClientEvents>) {
     socket.on("joinGameAck", (numPlayers) =>
-      this.changeState(ClientState.Lobby, { currentPlayers: numPlayers })
+      this.changeState(ClientState.Lobby, { actPlayers: numPlayers })
     );
 
     socket.on("gameStart", (playerDTOs, selfDTO) => {

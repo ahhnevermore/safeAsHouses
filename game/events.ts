@@ -1,38 +1,39 @@
 import { playerDTO, selfDTO } from "./dto.js";
+import { cardID, coins, publicID, tileID, unitID } from "./types.js";
 
 export type ClientEvents = {
-  flip: (tileID: string, unitID: number) => void;
+  flip: (tileID: tileID, unitID: unitID) => void;
   submitTurn: () => void;
-  placeCard: (tileID: string, cardVal: string, bet: number) => void;
+  placeCard: (tileID: tileID, cardVal: cardID, bet: coins) => void;
   buyCard: () => void;
   joinGame: () => void;
 };
 
 export type ServerEvents = {
-  flipAck: (publicID: string, tileID: string, unitID: number) => void;
-  flipRej: (tileID: string, unitID: number) => void;
-  yourTurn: (publicID: string, duration: number) => void;
-  waitTurn: (publicID: string, duration: number) => void;
-  winner: (publicID: string) => void;
-  income: (amount: number) => void;
+  flipAck: (publicID: publicID, tileID: tileID, unitID: unitID) => void;
+  flipRej: (tileID: tileID, unitID: unitID) => void;
+  yourTurn: (publicID: publicID, duration: number) => void;
+  waitTurn: (publicID: publicID, duration: number) => void;
+  winner: (publicID: publicID) => void;
+  income: (amount: coins) => void;
   placeCardAck: (
-    tileID: string,
-    cardVal: string,
-    bet: number,
-    unitID: number,
+    tileID: tileID,
+    cardID: cardID,
+    bet: coins,
+    unitID: unitID,
     swallowed: boolean
   ) => void;
   placeCardPublic: (
-    publicID: string,
-    tileID: string,
-    bet: number,
-    data: { unitID: number } | { unitID: number; cardVal: string }
+    publicID: publicID,
+    tileID: tileID,
+    bet: coins,
+    data: { unitID: unitID } | { unitID: unitID; cardID: cardID }
   ) => void;
-  placeCardRej: (tileID: string, cardVal: string, bet: number) => void;
-  buyCardPublic: (publicID: string) => void;
-  buyCardAck: (cardVal: string) => void;
+  placeCardRej: (tileID: tileID, cardID: cardID, bet: coins) => void;
+  buyCardPublic: (publicID: publicID) => void;
+  buyCardAck: (cardVal: cardID) => void;
   buyCardRej: () => void;
   joinGameAck: (numPlayers: number) => void;
   gameStart: (playerList: playerDTO[], dto: selfDTO) => void;
-  dcPlayer: (publicID: string) => void;
+  dcPlayer: (publicID: publicID) => void;
 };
