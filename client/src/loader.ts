@@ -10,10 +10,11 @@ import jackOverlay from "./assets/images/jackOverlay.png";
 import aceOverlay from "./assets/images/aceOverlay.png";
 import queenOverlay from "./assets/images/queenOverlay.png";
 import kingOverlay from "./assets/images/kingOverlay.png";
+import mainCastle from "./assets/images/mainCastle.png";
 
 export const ASSETS = {
   crown: crownURL,
-  castleIcon: castleIcon,
+  keepIcon: castleIcon,
   coinsIcon: coinsIcon,
   cardsIcon: cardsIcon,
   incomeIcon: incomeIcon,
@@ -23,6 +24,7 @@ export const ASSETS = {
   jackOverlay: jackOverlay,
   queenOverlay: queenOverlay,
   kingOverlay: kingOverlay,
+  castleIcon: mainCastle,
 };
 
 export async function loadAssets() {

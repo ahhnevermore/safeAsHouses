@@ -11,7 +11,7 @@ export class LobbyState implements IState {
     this.manager = stateManager;
     this.text = new PIXI.Text({
       text: "Waiting for players: 1/2",
-      style: { fill: 0xffffff, fontSize: 24 },
+      style: { fill: 0xffffff, fontSize: 24, fontFamily: "Courier" },
     });
 
     this.container.addChild(this.text);

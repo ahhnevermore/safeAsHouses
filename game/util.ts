@@ -10,6 +10,11 @@ export const PLAYER_COUNT: number = 4;
 export const RIVERS: string[] = ["4,4"];
 export const BASES: string[] = ["0,0", "0,8", "8,0", "8,8"];
 export const REG_HAND_SIZE: number = 5;
+export const TILE_CARD_LIMIT: number = 5;
+export const TILE_UNIT_LIMIT: number = 5;
+
+export const RIVER_TYPE = "river";
+export const BASE_TYPE = "base";
 
 export enum Suit {
   Spades = 0,
@@ -107,7 +112,8 @@ export class Card {
 }
 
 export class River {
-  turns: number = 5;
+  type: string = RIVER_TYPE;
+  turns: number = 0;
   owner: string | null = null;
   def: number = 10;
   constructor() {}
@@ -120,6 +126,7 @@ export class River {
 }
 
 export class Base {
+  type: string = BASE_TYPE;
   def: number = 15;
   constructor() {}
 }

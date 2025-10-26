@@ -1,5 +1,9 @@
 import * as PIXI from "pixi.js";
-import { colour } from "../../game/types.js";
+import { colour, publicID } from "../../game/types.js";
+import { BASE_TYPE, River, RIVER_TYPE, Structure } from "../../game/util.js";
+import { playerDTO } from "../../game/dto.js";
+import { ASSETS } from "./loader.js";
+import { BACKGROUND_ALPHA } from "./game.js";
 
 const BASE_ALPHA: number = 0.5;
 const SELECT_ALPHA: number = 0.7;
@@ -21,11 +25,13 @@ const layerConf: Record<Layer, { colour?: colour; alpha?: number }> = {
 };
 
 export class BoardTile extends PIXI.Container {
+  owner: playerDTO | null = null;
   base: PIXI.Sprite;
   select: PIXI.Sprite;
   hover: PIXI.Sprite;
   xIndex: number;
   yIndex: number;
+  struct: Structure | null = null;
 
   constructor(xIndex: number, yIndex: number, size: number) {
     super();
@@ -60,6 +66,22 @@ export class BoardTile extends PIXI.Container {
     this.on("pointerdown", () => this.emit("clicked", this));
     this.on("pointerover", () => this.setLayer(Layer.Hover));
     this.on("pointerout", () => this.clearLayer(Layer.Hover));
+  }
+
+  setOwner(owner: playerDTO) {
+    this.owner = owner;
+    this.setLayer(Layer.Base, owner.colour);
+  }
+
+  setStructure(struct: Structure) {
+    this.struct = struct;
+    if (struct.type == BASE_TYPE) {
+      let sprite = new PIXI.Sprite(PIXI.Texture.from(ASSETS.keepIcon));
+      sprite.x = 25;
+      sprite.y = 25;
+      sprite.alpha = 0.5;
+      this.addChild(sprite);
+    }
   }
 
   setLayer(layer: Layer, color?: colour, alpha?: number) {

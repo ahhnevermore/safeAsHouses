@@ -1,6 +1,6 @@
 import { ID, unitID } from "./types.js";
 import { Unit } from "./unit.js";
-import { Card, Scope, type Structure } from "./util.js";
+import { Card, Scope, TILE_CARD_LIMIT, TILE_UNIT_LIMIT, type Structure } from "./util.js";
 
 export class Tile {
   owner: ID | null = null;
@@ -9,6 +9,18 @@ export class Tile {
   structures: Structure[] = [];
 
   constructor() {}
+
+  canAddUnit(playerID: ID, faceup: boolean): boolean {
+    const units = this.units[playerID];
+    if (units) {
+      if (faceup) {
+        return units.filter((u) => u.faceup).length < TILE_UNIT_LIMIT;
+      } else {
+        return units.filter((u) => !u.faceup).length < TILE_CARD_LIMIT;
+      }
+    }
+    return false;
+  }
 
   placeUnit(
     unit: Unit,

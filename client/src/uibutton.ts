@@ -51,7 +51,7 @@ export class UIButton extends PIXI.Container {
     // btnText
     this.btnText = new PIXI.Text({
       text,
-      style: { fill: 0xffffff, fontSize: 12, fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 14, fontWeight: "bold", fontFamily: "Courier" },
     });
     this.btnText.anchor.set(0.5);
     this.btnText.x = width / 2 + (this.icon ? height / 4 : 0);

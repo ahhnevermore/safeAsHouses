@@ -1,4 +1,4 @@
-import { cardID, colour, publicID } from "./types.js";
+import { cardID, colour, publicID, unitID } from "./types.js";
 
 export class playerDTO {
   id: publicID = "" as publicID;
@@ -13,4 +13,10 @@ export class selfDTO {
   id: publicID = "" as publicID;
   name: string = "Guest";
   hand: cardID[] = [];
+}
+
+export class unitDTO {
+  id: unitID = 0 as unitID;
+  stack: cardID[] = [];
+  faceup: boolean = false;
 }

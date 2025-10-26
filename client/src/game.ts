@@ -1,7 +1,19 @@
 import * as PIXI from "pixi.js";
 import { IState, StateManager } from "./stateManager.js";
 import { Manager } from "socket.io-client";
-import { BASES, BOARD_SIZE, Card, ClientState, TILE_COINS, Vec2 } from "../../game/util.js";
+import {
+  Base,
+  BASE_TYPE,
+  BASES,
+  BOARD_SIZE,
+  Card,
+  ClientState,
+  River,
+  RIVER_TYPE,
+  RIVERS,
+  TILE_COINS,
+  Vec2,
+} from "../../game/util.js";
 import { playerDTO, selfDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
 import { BoardTile, Layer } from "./boardTile.js";
@@ -25,7 +37,7 @@ const HUD_WIDTH: number = 560;
 const HUD_HEIGHT: number = 720;
 const BOARD_WIDTH: number = 720;
 const BOARD_HEIGHT: number = 720;
-const BACKGROUND_ALPHA: number = 0.4;
+export const BACKGROUND_ALPHA: number = 0.4;
 const HUD_BACKGROUND: colour = 0x134021 as colour;
 const HUD_HIGHLIGHT: colour = 0x4bfa82 as colour;
 const HUD_INLAY: colour = 0x164b27 as colour;
@@ -38,6 +50,7 @@ const ALL_IN_BTN: colour = 0x240302 as colour;
 const MOVE_BTN: colour = 0x085687 as colour;
 const BUY_BTN: colour = CALL_BTN;
 const ADD_TILE_BTN: colour = 0x44bf0b as colour;
+const FLIP_BTN: colour = ADD_TILE_BTN;
 const SUBMIT_BTN: colour = CALL_BTN;
 const END_TURN_BTN: colour = RAISE_BTN;
 
@@ -93,7 +106,29 @@ export class GameState implements IState {
     stats: Record<string, PIXI.Text[]>;
     actTile: PIXI.Text | null;
     playerDisplays: Partial<Record<string, PIXI.Container>>;
-  } = { stats: {}, actTile: null, playerDisplays: {} };
+    structIcon: PIXI.Sprite | null;
+    structCard: UICard | null;
+    structText1: PIXI.Text | null;
+    structText2: PIXI.Text | null;
+    moveBtn: UIButton | null;
+    flipBtn: UIButton | null;
+    callBtn: UIButton | null;
+    raiseBtn: UIButton | null;
+    allInBtn: UIButton | null;
+  } = {
+    stats: {},
+    actTile: null,
+    playerDisplays: {},
+    structIcon: null,
+    structCard: null,
+    structText1: null,
+    structText2: null,
+    moveBtn: null,
+    flipBtn: null,
+    callBtn: null,
+    raiseBtn: null,
+    allInBtn: null,
+  };
 
   constructor(stateManager: StateManager) {
     this.manager = stateManager;
@@ -154,10 +189,31 @@ export class GameState implements IState {
           this.mainUI.selTile.clearLayer(Layer.Select);
         }
         this.mainUI.selTile = tile;
-        this.mainUI.selTile.setLayer(Layer.Select);
-        if (this.tileUI.actTile) {
-          this.tileUI.actTile.text = `${tile.xIndex},${tile.yIndex}`;
+        this.selectTile(tile);
+      }
+    }
+  }
+
+  selectTile(tile: BoardTile) {
+    tile.setLayer(Layer.Select);
+    if (this.tileUI.actTile) {
+      this.tileUI.actTile.text = `${tile.xIndex},${tile.yIndex}`;
+    }
+    if (this.tileUI.structIcon) {
+      if (tile.struct) {
+        this.tileUI.structIcon.visible = true;
+        switch (tile.struct.type) {
+          case RIVER_TYPE:
+            this.tileUI.structIcon.texture = PIXI.Texture.from(ASSETS.castleIcon);
+            this.tileUI.structIcon.scale.set(0.3);
+            break;
+          case BASE_TYPE:
+            this.tileUI.structIcon.texture = PIXI.Texture.from(ASSETS.keepIcon);
+            this.tileUI.structIcon.scale.set(0.7);
+            break;
         }
+      } else {
+        this.tileUI.structIcon.visible = false;
       }
     }
   }
@@ -190,13 +246,14 @@ export class GameState implements IState {
     this.model.players.forEach((pl, i) => {
       const tileVec = Vec2.fromKey(BASES[i]);
       this.model.territory[pl.id] = new Set<string>([BASES[i]]);
-      this.mainUI.tiles[tileVec.x][tileVec.y].setLayer(Layer.Base, pl.colour);
-      const baseSprite = new PIXI.Sprite(PIXI.Texture.from(ASSETS.castleIcon));
-      this.container.addChild(baseSprite);
-      [baseSprite.x, baseSprite.y] = boardToWorld(tileVec.x, tileVec.y);
-      baseSprite.x += 25;
-      baseSprite.y += 25;
-      baseSprite.alpha = BACKGROUND_ALPHA;
+      const tile = this.mainUI.tiles[tileVec.x][tileVec.y];
+      tile.setStructure(new Base());
+      tile.setOwner(pl);
+    });
+    RIVERS.forEach((r) => {
+      const tileVec = Vec2.fromKey(r);
+      const tile = this.mainUI.tiles[tileVec.x][tileVec.y];
+      tile.setStructure(new River());
     });
   }
 
@@ -215,7 +272,7 @@ export class GameState implements IState {
 
       const nameLabel = new PIXI.Text({
         text: pl.name,
-        style: { fill: 0xffffff, fontSize: 12, fontWeight: "bold" },
+        style: { fill: 0xffffff, fontSize: 14, fontFamily: "Courier", fontWeight: "bold" },
       });
       nameLabel.x = tdp_TagWidth + 20;
       nameLabel.y = 3;
@@ -230,25 +287,59 @@ export class GameState implements IState {
       this.tileDisplayContainer.addChild(box);
       this.tileUI.playerDisplays[pl.id] = box;
     });
-    const moveBtn = new UIButton({ text: "Move", colour: MOVE_BTN });
-    moveBtn.position.set(0, 480);
+    this.tileUI.moveBtn = new UIButton({ text: "Move", colour: MOVE_BTN });
+    this.tileUI.moveBtn.position.set(0, 480);
 
-    const callBtn = new UIButton({ text: "Call", colour: CALL_BTN });
-    callBtn.position.set(BTN_WIDTH, 480);
+    this.tileUI.flipBtn = new UIButton({ text: "Flip", colour: FLIP_BTN });
+    this.tileUI.flipBtn.position.set(BTN_WIDTH, 480);
 
-    const raiseBtn = new UIButton({ text: "Raise", colour: RAISE_BTN });
-    raiseBtn.position.set(2 * BTN_WIDTH, 480);
+    this.tileUI.callBtn = new UIButton({ text: "Call", colour: CALL_BTN });
+    this.tileUI.callBtn.position.set(2 * BTN_WIDTH, 480);
 
-    const allInBtn = new UIButton({ text: "All In", colour: ALL_IN_BTN });
-    allInBtn.position.set(4 * BTN_WIDTH, 480);
+    this.tileUI.raiseBtn = new UIButton({ text: "Raise", colour: RAISE_BTN });
+    this.tileUI.raiseBtn.position.set(3 * BTN_WIDTH, 480);
+
+    this.tileUI.allInBtn = new UIButton({ text: "All In", colour: ALL_IN_BTN });
+    this.tileUI.allInBtn.position.set(HUD_WIDTH - BTN_WIDTH, 480);
 
     this.tileUI.actTile = new PIXI.Text({
       text: "0,0",
-      style: { fill: 0xffffff, fontSize: 18, fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 18, fontFamily: "Courier", fontWeight: "bold" },
     });
     this.tileUI.actTile.position.set(10, -30);
 
-    this.tileDisplayContainer.addChild(moveBtn, callBtn, raiseBtn, allInBtn, this.tileUI.actTile);
+    this.tileUI.structIcon = new PIXI.Sprite();
+    this.tileUI.structIcon.position.set(60, -30);
+
+    this.tileUI.structText1 = new PIXI.Text({
+      text: "",
+      style: { fill: 0xffffff, fontSize: 14, fontFamily: "Courier", fontWeight: "bold" },
+    });
+    this.tileUI.structText1.position.set(70, -30);
+
+    this.tileUI.structCard = new UICard(7, 20, 5);
+    this.tileUI.structCard.position.set(100, -30);
+
+    this.tileUI.structText2 = new PIXI.Text({
+      text: "",
+      style: { fill: 0xffffff, fontSize: 14, fontFamily: "Courier", fontWeight: "bold" },
+    });
+    this.tileUI.structText1.position.set(130, -30);
+
+    this.tileDisplayContainer.addChild(
+      this.tileUI.moveBtn,
+      this.tileUI.callBtn,
+      this.tileUI.raiseBtn,
+      this.tileUI.allInBtn,
+      this.tileUI.flipBtn,
+
+      this.tileUI.actTile,
+
+      this.tileUI.structIcon,
+      this.tileUI.structCard,
+      this.tileUI.structText1,
+      this.tileUI.structText2
+    );
   }
 
   createPlayerHeader(pl: playerDTO): PIXI.Graphics {
@@ -269,7 +360,7 @@ export class GameState implements IState {
       }
     }
 
-    const iconPaths = [ASSETS.cardsIcon, ASSETS.castleIcon, ASSETS.coinsIcon];
+    const iconPaths = [ASSETS.cardsIcon, ASSETS.keepIcon, ASSETS.coinsIcon];
     const iconScales = [0.5, 0.5, 0.5];
     const iconYInc = [2, 2, 2];
     const iconX = [135, 180, 225];
@@ -285,12 +376,13 @@ export class GameState implements IState {
         text: "0",
         style: {
           fill: 0xffffff,
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: "bold",
+          fontFamily: "Courier",
         },
       });
       statLabel.x = labelX[i];
-      statLabel.y = 10;
+      statLabel.y = 12;
       statLabel.anchor.set(0, 0.5);
       statLabel.label = playerStatPrefix + i;
       if (!this.tileUI.stats[pl.id]) {

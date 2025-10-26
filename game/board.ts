@@ -45,12 +45,18 @@ export class Board {
     const xy = Vec2.fromKey(tileID);
     if (this.isValidPlacement(xy, playerID)) {
       const tile = this.getTile(xy.x, xy.y)!;
-      let [success, territoryCaptured, unitSwallowed, unitID] = tile.placeUnit(unit, playerID, bet);
-      if (success) {
-        if (territoryCaptured) {
-          this.capture(playerID, xy);
+      if (tile.canAddUnit(playerID, false)) {
+        let [success, territoryCaptured, unitSwallowed, unitID] = tile.placeUnit(
+          unit,
+          playerID,
+          bet
+        );
+        if (success) {
+          if (territoryCaptured) {
+            this.capture(playerID, xy);
+          }
+          return [success, unitSwallowed, unitID];
         }
-        return [success, unitSwallowed, unitID];
       }
     }
     return [false, false, 0 as unitID];
@@ -61,9 +67,10 @@ export class Board {
     if (origTile) {
       const unit = origTile.getUnit(playerID, unitID);
       if (unit && this.isValidMove(playerID, unit, orig, dest)) {
-        origTile.removeUnit(playerID, unitID);
         const destTile = this.getTile(dest.x, dest.y);
-        if (destTile) {
+        if (destTile && destTile.canAddUnit(playerID, unit.faceup)) {
+          origTile.removeUnit(playerID, unitID);
+
           if (destTile.noCards()) {
             this.capture(playerID, dest);
           }
@@ -182,14 +189,16 @@ export class Board {
     return res;
   }
 
-  flipUnit(playerID: string, tileID: string, unitID: number): boolean {
+  flipUnit(playerID: ID, tileID: tileID, unitID: unitID): boolean {
     const xy = Vec2.fromKey(tileID);
     const tile = this.getTile(xy.x, xy.y);
     if (tile) {
-      const unit = tile.getUnit(playerID, unitID);
-      if (unit) {
-        unit.flip();
-        return true;
+      if (tile.canAddUnit(playerID, true)) {
+        const unit = tile.getUnit(playerID, unitID);
+        if (unit && unit.faceup == false) {
+          unit.flip();
+          return true;
+        }
       }
     }
     return false;

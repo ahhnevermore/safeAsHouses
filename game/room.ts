@@ -8,6 +8,7 @@ import { EventEmitter } from "events";
 import { Logger } from "winston";
 import { Unit } from "./unit.js";
 import { cardID, coins, ID, publicID, tileID, unitID } from "./types.js";
+import { playerDTO } from "./dto.js";
 
 export class Room extends EventEmitter {
   private static nextID = 1;
@@ -159,7 +160,7 @@ export class Room extends EventEmitter {
     socket.on("flip", (tileID: tileID, unitID: unitID) => {
       const currPlayer = this.getCurrPlayer();
       if (currPlayer && currPlayer.id == socket.id) {
-        if (this.board.flipUnit(socket.id, tileID, unitID)) {
+        if (this.board.flipUnit(socket.id as ID, tileID, unitID)) {
           this.sendRoom("flipAck", currPlayer.publicID, tileID, unitID);
           this.startTurnTimer();
           return;

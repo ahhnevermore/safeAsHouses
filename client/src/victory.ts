@@ -10,14 +10,14 @@ export class VictoryState implements IState {
     this.manager = stateManger;
     const msg = new PIXI.Text({
       text: "Player 1 Wins!",
-      style: { fill: 0xffff00, fontSize: 36 },
+      style: { fill: 0xffff00, fontSize: 36, fontFamily: "Courier" },
     });
 
     const button = new PIXI.Graphics().roundRect(0, 60, 250, 60, 15).fill({ color: 0x444444 });
 
     const btnText = new PIXI.Text({
       text: "Back to Menu",
-      style: { fill: 0xffffff, fontSize: 20 },
+      style: { fill: 0xffffff, fontSize: 20, fontFamily: "Courier" },
     });
     btnText.x = 30;
     btnText.y = 75;

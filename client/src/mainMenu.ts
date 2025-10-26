@@ -10,13 +10,13 @@ export class MainMenuState implements IState {
     this.manager = stateManager;
     const introText = new PIXI.Text({
       text: "Safe As Houses",
-      style: { fill: 0xffffff, fontSize: 24 },
+      style: { fill: 0xffffff, fontSize: 24, fontFamily: "Courier" },
     });
     introText.y = -50;
     const button = new PIXI.Graphics().roundRect(0, 0, 200, 60, 15).fill({ color: 0x333333 });
     const text = new PIXI.Text({
       text: "Join Room",
-      style: { fill: 0xffffff, fontSize: 20 },
+      style: { fill: 0xffffff, fontSize: 20, fontFamily: "Courier" },
     });
     text.x = 50;
     text.y = 15;
