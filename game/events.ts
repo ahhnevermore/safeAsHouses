@@ -34,6 +34,6 @@ export type ServerEvents = {
   buyCardAck: (cardVal: cardID) => void;
   buyCardRej: () => void;
   joinGameAck: (numPlayers: number) => void;
-  gameStart: (playerList: playerDTO[], dto: selfDTO) => void;
+  roundStart: (playerList: playerDTO[], dto: selfDTO, river: cardID[], gameStart?: boolean) => void;
   dcPlayer: (publicID: publicID) => void;
 };

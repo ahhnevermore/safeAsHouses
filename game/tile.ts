@@ -6,7 +6,7 @@ export class Tile {
   owner: ID | null = null;
   units: Partial<Record<string, Unit[]>> = {};
   bets: Partial<Record<string, number>> = {};
-  structures: Structure[] = [];
+  structure: Structure | null = null;
 
   constructor() {}
 
@@ -77,8 +77,8 @@ export class Tile {
       .every(([_, arr]) => (arr ?? []).length === 0); // undefined → []
   }
 
-  addStructure(structure: Structure) {
-    this.structures.push(structure);
+  setStructure(structure: Structure) {
+    this.structure = structure;
   }
 
   getUnit(playerID: string, unitID: number): Unit | undefined {

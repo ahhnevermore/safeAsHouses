@@ -8,6 +8,7 @@ import {
   BOARD_SIZE,
   Card,
   ClientState,
+  isRiver,
   River,
   RIVER_TYPE,
   RIVERS,
@@ -29,27 +30,27 @@ enum ActiveAction {
 
 const PLAYER_COLOURS: colour[] = [
   0x05d9fa as colour,
-  0xdde00d as colour,
-  0xe902fa as colour,
-  0xfa5502 as colour,
+  0xfa2605 as colour,
+  0xf807df as colour,
+  0x07f820 as colour,
 ];
 const HUD_WIDTH: number = 560;
 const HUD_HEIGHT: number = 720;
 const BOARD_WIDTH: number = 720;
 const BOARD_HEIGHT: number = 720;
-export const BACKGROUND_ALPHA: number = 0.4;
+export const BACKGROUND_ALPHA: number = 0.6;
 const HUD_BACKGROUND: colour = 0x134021 as colour;
 const HUD_HIGHLIGHT: colour = 0x4bfa82 as colour;
 const HUD_INLAY: colour = 0x164b27 as colour;
 const HUD_INLAY2: colour = 0x18532b as colour;
 const HUD_GREY: colour = 0x383d3a as colour;
 const BTN_GREY: colour = 0x626a65 as colour;
-const CALL_BTN: colour = 0xf5aa42 as colour;
+const CALL_BTN: colour = 0xa66102 as colour;
 const RAISE_BTN: colour = 0xc41910 as colour;
 const ALL_IN_BTN: colour = 0x240302 as colour;
 const MOVE_BTN: colour = 0x085687 as colour;
 const BUY_BTN: colour = CALL_BTN;
-const ADD_TILE_BTN: colour = 0x44bf0b as colour;
+const ADD_TILE_BTN: colour = 0x286333 as colour;
 const FLIP_BTN: colour = ADD_TILE_BTN;
 const SUBMIT_BTN: colour = CALL_BTN;
 const END_TURN_BTN: colour = RAISE_BTN;
@@ -177,8 +178,8 @@ export class GameState implements IState {
     this.hud.addChild(this.handDisplayContainer);
 
     this.mainUI.playerHighlight = new PIXI.Graphics()
-      .rect(0, 0, tdp_BoxWidth, tdp_HeaderHeight)
-      .stroke({ color: HUD_HIGHLIGHT, width: 2 });
+      .rect(1, 1, tdp_BoxWidth - 1, tdp_HeaderHeight - 1)
+      .stroke({ color: 0xffffff, width: 1 });
     this.hud.addChild(this.mainUI.playerHighlight);
   }
 
@@ -199,22 +200,42 @@ export class GameState implements IState {
     if (this.tileUI.actTile) {
       this.tileUI.actTile.text = `${tile.xIndex},${tile.yIndex}`;
     }
-    if (this.tileUI.structIcon) {
-      if (tile.struct) {
-        this.tileUI.structIcon.visible = true;
-        switch (tile.struct.type) {
-          case RIVER_TYPE:
-            this.tileUI.structIcon.texture = PIXI.Texture.from(ASSETS.castleIcon);
-            this.tileUI.structIcon.scale.set(0.3);
-            break;
-          case BASE_TYPE:
-            this.tileUI.structIcon.texture = PIXI.Texture.from(ASSETS.keepIcon);
-            this.tileUI.structIcon.scale.set(0.7);
-            break;
-        }
-      } else {
-        this.tileUI.structIcon.visible = false;
+    if (
+      !this.tileUI.structIcon ||
+      !this.tileUI.structText1 ||
+      !this.tileUI.structText2 ||
+      !this.tileUI.structCard
+    ) {
+      return;
+    }
+    if (tile.struct) {
+      this.tileUI.structIcon.visible = true;
+      this.tileUI.structText1.visible = true;
+      switch (tile.struct.type) {
+        case RIVER_TYPE:
+          const river = tile.struct as River;
+          this.tileUI.structIcon.texture = PIXI.Texture.from(ASSETS.castleIcon);
+          this.tileUI.structIcon.scale.set(0.3);
+          this.tileUI.structText1.text = river.def;
+          if (river.card) {
+            this.tileUI.structCard.visible = true;
+            this.tileUI.structCard.show(river.card.suit, river.card.rank);
+          }
+          this.tileUI.structText2.visible = true;
+          this.tileUI.structText2.text = river.turns;
+          break;
+        case BASE_TYPE:
+          this.tileUI.structIcon.texture = PIXI.Texture.from(ASSETS.keepIcon);
+          this.tileUI.structIcon.scale.set(0.7);
+          this.tileUI.structText1.text = tile.struct.def;
+
+          break;
       }
+    } else {
+      this.tileUI.structIcon.visible = false;
+      this.tileUI.structText1.visible = false;
+      this.tileUI.structText2.visible = false;
+      this.tileUI.structCard.visible = false;
     }
   }
 
@@ -226,22 +247,36 @@ export class GameState implements IState {
     const col = actIndex % 2;
     const row = Math.floor(actIndex / 2);
 
-    this.mainUI.playerHighlight?.position.set(
-      BOARD_WIDTH + col * tdp_BoxWidth,
-      tdp_MarginY + row * tdp_BoxHeight
-    );
+    if (this.mainUI.playerHighlight) {
+      this.mainUI.playerHighlight.position.set(
+        BOARD_WIDTH + col * tdp_BoxWidth,
+        tdp_MarginY + row * tdp_BoxHeight
+      );
+      this.mainUI.playerHighlight.tint = this.model.players[actIndex].colour ?? HUD_HIGHLIGHT;
+    }
   }
 
-  initializeGame(playerDTOs: playerDTO[], selfDTO: selfDTO) {
+  initializeGame(playerDTOs: playerDTO[], selfDTO: selfDTO, riverCards: cardID[]) {
     this.model.players = playerDTOs;
     this.model.self = selfDTO;
     this.setupTileDisplay();
     this.setupHandDisplay();
     this.setupPlayerBases();
+    this.updateRivers(riverCards);
     this.updateHandDisplay(selfDTO.hand);
     this.onTileClicked(this.mainUI.tiles[0][0]);
   }
 
+  updateRivers(riverCards: cardID[]) {
+    RIVERS.forEach((r, i) => {
+      const tileVec = Vec2.fromKey(r);
+      const tile = this.mainUI.tiles[tileVec.x][tileVec.y];
+      if (tile && isRiver(tile.struct) && i < riverCards.length) {
+        const card = Card.fromKey(riverCards[i]);
+        tile.struct.setCard(card);
+      }
+    });
+  }
   setupPlayerBases() {
     this.model.players.forEach((pl, i) => {
       const tileVec = Vec2.fromKey(BASES[i]);
@@ -304,27 +339,27 @@ export class GameState implements IState {
 
     this.tileUI.actTile = new PIXI.Text({
       text: "0,0",
-      style: { fill: 0xffffff, fontSize: 18, fontFamily: "Courier", fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 20, fontFamily: "Courier", fontWeight: "bold" },
     });
-    this.tileUI.actTile.position.set(10, -30);
+    this.tileUI.actTile.position.set(10, -25);
 
     this.tileUI.structIcon = new PIXI.Sprite();
-    this.tileUI.structIcon.position.set(60, -30);
+    this.tileUI.structIcon.position.set(80, -30);
 
     this.tileUI.structText1 = new PIXI.Text({
       text: "",
-      style: { fill: 0xffffff, fontSize: 14, fontFamily: "Courier", fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 18, fontFamily: "Courier", fontWeight: "bold" },
     });
-    this.tileUI.structText1.position.set(70, -30);
+    this.tileUI.structText1.position.set(120, -25);
 
-    this.tileUI.structCard = new UICard(7, 20, 5);
-    this.tileUI.structCard.position.set(100, -30);
+    this.tileUI.structCard = new UICard(27, 30, 18);
+    this.tileUI.structCard.position.set(160, -30);
 
     this.tileUI.structText2 = new PIXI.Text({
       text: "",
-      style: { fill: 0xffffff, fontSize: 14, fontFamily: "Courier", fontWeight: "bold" },
+      style: { fill: 0xffffff, fontSize: 18, fontFamily: "Courier", fontWeight: "bold" },
     });
-    this.tileUI.structText1.position.set(130, -30);
+    this.tileUI.structText2.position.set(205, -25);
 
     this.tileDisplayContainer.addChild(
       this.tileUI.moveBtn,

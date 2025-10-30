@@ -1,15 +1,16 @@
 import * as PIXI from "pixi.js";
 import { colour, publicID } from "../../game/types.js";
-import { BASE_TYPE, River, RIVER_TYPE, Structure } from "../../game/util.js";
+import { BASE_TYPE, isBase, River, RIVER_TYPE, Structure } from "../../game/util.js";
 import { playerDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
 import { BACKGROUND_ALPHA } from "./game.js";
 
 const BASE_ALPHA: number = 0.5;
-const SELECT_ALPHA: number = 0.7;
+const SELECT_ALPHA: number = 0.4;
 const HOVER_ALPHA: number = 0.3;
+const STRUCT_ALPHA: number = 0.7;
 
-const SELECT_OVERLAY: colour = 0x350354 as colour;
+const SELECT_OVERLAY: colour = 0xdda122 as colour;
 const HOVER_OVERLAY: colour = 0xffffff as colour;
 
 export enum Layer {
@@ -75,11 +76,11 @@ export class BoardTile extends PIXI.Container {
 
   setStructure(struct: Structure) {
     this.struct = struct;
-    if (struct.type == BASE_TYPE) {
+    if (isBase(struct)) {
       let sprite = new PIXI.Sprite(PIXI.Texture.from(ASSETS.keepIcon));
       sprite.x = 25;
       sprite.y = 25;
-      sprite.alpha = 0.5;
+      sprite.alpha = STRUCT_ALPHA;
       this.addChild(sprite);
     }
   }

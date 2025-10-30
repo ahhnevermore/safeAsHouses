@@ -68,9 +68,11 @@ export class StateManager {
       this.changeState(ClientState.Lobby, { actPlayers: numPlayers })
     );
 
-    socket.on("gameStart", (playerDTOs, selfDTO) => {
+    socket.on("roundStart", (playerDTOs, selfDTO, riverCards, gameStart) => {
       this.changeState(ClientState.Game);
-      this.game.initializeGame(playerDTOs, selfDTO);
+      if (gameStart) {
+        this.game.initializeGame(playerDTOs, selfDTO, riverCards);
+      }
     });
 
     socket.on("yourTurn", (publicID, duration) => {

@@ -1,6 +1,18 @@
 import { Board } from "./board.js";
 import { type ClientEvents, type ServerEvents } from "./events.js";
-import { BASES, Card, PLAYER_COUNT, REG_HAND_SIZE, Scope, TILE_COINS, Vec2 } from "./util.js";
+import {
+  BASES,
+  Card,
+  isRiver,
+  PLAYER_COUNT,
+  REG_HAND_SIZE,
+  River,
+  RIVER_TYPE,
+  RIVERS,
+  Scope,
+  TILE_COINS,
+  Vec2,
+} from "./util.js";
 import { Deck } from "./deck.js";
 import { Player } from "./player.js";
 import { Server as IOServer, Socket as IOSocket } from "socket.io";
@@ -50,13 +62,31 @@ export class Room extends EventEmitter {
   }
 
   startGame() {
+    this.startRound();
+  }
+  startRound() {
     this.players.forEach((pl, idx) => {
-      pl.takeCards(this.deck.deal(REG_HAND_SIZE));
+      pl.takeCards(this.deck.deal(REG_HAND_SIZE - pl.hand.length));
       this.board.capture(pl.id, this.board.bases[idx]);
+    });
+    const riverCards: cardID[] = [];
+    RIVERS.forEach((r) => {
+      const tileVec = Vec2.fromKey(r);
+      const tile = this.board.getTile(tileVec.x, tileVec.y);
+      if (tile) {
+        if (isRiver(tile.structure)) {
+          const dealt = this.deck.deal(1);
+          if (dealt.length >= 1) {
+            const riverCard = dealt[0];
+            tile.structure.setCard(riverCard);
+            riverCards.push(riverCard.toKey());
+          }
+        }
+      }
     });
     const playerDTOs = this.players.map((pl) => pl.toPlayerDTO());
     this.players.forEach((pl) => {
-      this.sendPlayer(pl.id, "gameStart", playerDTOs, pl.toSelfDTO());
+      this.sendPlayer(pl.id, "roundStart", playerDTOs, pl.toSelfDTO(), riverCards, true);
     });
     this.startTurnTimer();
   }

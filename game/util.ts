@@ -116,12 +116,16 @@ export class River {
   turns: number = 0;
   owner: string | null = null;
   def: number = 10;
+  card: Card | null = null;
   constructor() {}
   setOwner(owner: string | null) {
     this.owner = owner;
   }
   setTurns(turns: number) {
     this.turns = turns;
+  }
+  setCard(card: Card) {
+    this.card = card;
   }
 }
 
@@ -132,3 +136,11 @@ export class Base {
 }
 
 export type Structure = River | Base;
+
+export function isRiver(s: Structure | undefined | null): s is River {
+  return !!s && s.type === RIVER_TYPE;
+}
+
+export function isBase(s: Structure | undefined | null): s is Base {
+  return !!s && s.type === BASE_TYPE;
+}

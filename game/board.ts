@@ -14,6 +14,7 @@ import {
   KING_RADIUS,
   RIVERS,
   BASES,
+  isRiver,
 } from "./util.js";
 import { coins, ID, tileID, unitID } from "./types.js";
 
@@ -26,9 +27,19 @@ export class Board {
   territory: Partial<Record<string, Set<string>>> = {};
 
   constructor() {
-    this.rivers.forEach((elem) => this.getTile(elem.x, elem.y)?.addStructure(new River()));
+    this.rivers.forEach((elem) => {
+      const tile = this.getTile(elem.x, elem.y);
+      if (tile) {
+        tile.setStructure(new River());
+      }
+    });
 
-    this.bases.forEach((base) => this.getTile(base.x, base.y)?.addStructure(new Base()));
+    this.bases.forEach((base) => {
+      const tile = this.getTile(base.x, base.y);
+      if (tile) {
+        tile.setStructure(new Base());
+      }
+    });
   }
 
   getTile(x: number, y: number): Tile | undefined {
@@ -120,13 +131,12 @@ export class Board {
   updateRivers() {
     this.rivers.forEach((xy) => {
       const tile = this.getTile(xy.x, xy.y)!;
-      const river = tile.structures.filter((structure) => structure instanceof River)[0]!;
-      if (tile.owner != null) {
-        if (river.owner == tile.owner) {
-          river.turns++;
+      if (tile.owner != null && isRiver(tile.structure)) {
+        if (tile.structure.owner == tile.owner) {
+          tile.structure.turns++;
         } else {
-          river.owner = tile.owner;
-          river.turns = 1;
+          tile.structure.owner = tile.owner;
+          tile.structure.turns = 1;
         }
       }
     });
@@ -150,10 +160,9 @@ export class Board {
   checkRiverWin(): string | null {
     for (var i = 0; i < this.rivers.length; i++) {
       const xy = this.rivers[i]!;
-      const tile = this.getTile(xy.x, xy.y)!;
-      const river = tile.structures.filter((structure) => structure instanceof River)[0]!;
-      if (river.turns >= 10) {
-        return river.owner;
+      const tile = this.getTile(xy.x, xy.y);
+      if (tile && isRiver(tile.structure) && tile.structure.turns >= 10) {
+        return tile.structure.owner;
       }
     }
     return null;
