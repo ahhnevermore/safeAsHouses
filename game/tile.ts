@@ -1,11 +1,11 @@
-import { ID, unitID } from "./types.js";
+import { coins, ID, unitID } from "./types.js";
 import { Unit } from "./unit.js";
 import { Card, Scope, TILE_CARD_LIMIT, TILE_UNIT_LIMIT, type Structure } from "./util.js";
 
 export class Tile {
   owner: ID | null = null;
-  units: Partial<Record<string, Unit[]>> = {};
-  bets: Partial<Record<string, number>> = {};
+  units: Partial<Record<ID, Unit[]>> = {};
+  bets: Partial<Record<ID, coins>> = {};
   structure: Structure | null = null;
 
   constructor() {}
@@ -59,9 +59,9 @@ export class Tile {
 
     if (bet > 0) {
       if (this.bets[playerID]) {
-        this.bets[playerID] += bet;
+        this.bets[playerID] = (this.bets[playerID] + bet) as coins;
       } else {
-        this.bets[playerID] = bet;
+        this.bets[playerID] = bet as coins;
       }
     }
     return [success, territoryCaptured, unitSwallowed, unitID];
@@ -71,32 +71,38 @@ export class Tile {
     return Object.values(this.units).every((arr) => !arr || arr.length === 0);
   }
 
-  onlyOnePlayerCards(key: string): boolean {
-    return Object.entries(this.units)
-      .filter(([k]) => k !== key)
-      .every(([_, arr]) => (arr ?? []).length === 0); // undefined → []
+  onlyOnePlayerCards(key: ID): boolean {
+    const selfCards = this.units[key] ?? [];
+    return (
+      selfCards.length > 0 &&
+      Object.entries(this.units)
+        .filter(([k]) => k !== key)
+        .every(([_, arr]) => (arr ?? []).length === 0) // undefined → []
+    );
   }
 
   setStructure(structure: Structure) {
     this.structure = structure;
   }
 
-  getUnit(playerID: string, unitID: number): Unit | undefined {
+  getUnit(playerID: ID, unitID: unitID): Unit | undefined {
     return this.units[playerID]?.filter((unit) => unit.id == unitID)[0];
   }
 
-  removeUnit(playerID: string, unitID: number) {
+  removeUnit(playerID: ID, unitID: unitID) {
     this.units[playerID] = this.units[playerID]?.filter((unit) => unit.id != unitID)!;
   }
 
-  addUnit(playerID: string, unit: Unit) {
+  addUnit(playerID: ID, unit: Unit) {
     this.units[playerID]?.push(unit);
   }
 
-  getMods(playerID: string, modScope: Scope): Card[] {
+  getMods(playerID: ID, modScope: Scope): Card[] {
     if (this.units[playerID]) {
       return this.units[playerID]?.flatMap((unit) => unit.getMod(modScope));
     }
     return [];
   }
+
+  
 }

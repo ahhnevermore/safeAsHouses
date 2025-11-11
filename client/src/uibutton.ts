@@ -1,8 +1,9 @@
 import * as PIXI from "pixi.js";
-import { BTN_HEIGHT, BTN_WIDTH } from "./game.js";
+import { BTN_HEIGHT, BTN_WIDTH, BtnName } from "./game.js";
 import { colour } from "../../game/types.js";
 
 export interface UIButtonOptions {
+  btnName: BtnName;
   text: string;
   colour?: colour;
   width?: number;
@@ -17,25 +18,25 @@ export class UIButton extends PIXI.Container {
   private btnText: PIXI.Text;
   private icon?: PIXI.Sprite;
   private baseColor: colour;
-  private callback: () => void;
   private disabled: boolean;
+  name: BtnName;
 
   constructor({
+    btnName,
     text,
     colour = 0x4bfa82 as colour,
     width = BTN_WIDTH,
     height = BTN_HEIGHT,
     iconTexture,
-    onClick = () => {},
     disabled = false,
   }: UIButtonOptions) {
     super();
     this.baseColor = colour;
-    this.callback = onClick;
     this.disabled = disabled;
 
     // Background
     this.bg = new PIXI.Graphics().rect(0, 0, width, height).fill({ color: this.baseColor });
+    this.name = btnName;
     this.addChild(this.bg);
 
     // Icon (optional)
@@ -82,12 +83,12 @@ export class UIButton extends PIXI.Container {
       this.bg.tint = 0xffffff;
     }, 100);
 
-    this.callback();
+    this.emit("clicked", this);
   }
 
   private onHover() {
     if (this.disabled) return;
-    this.bg.tint = 0xbbbbbb;
+    this.bg.tint = 0xdddddd;
   }
 
   private onOut() {
@@ -100,6 +101,8 @@ export class UIButton extends PIXI.Container {
     this.interactive = enabled;
     this.cursor = enabled ? "pointer" : "default";
     this.alpha = enabled ? 1.0 : 0.5;
+    this.bg.tint = enabled ? 0xffffff : 0x999999;
+    this.btnText.style.fill = enabled ? 0xffffff : 0xaaaaaa;
   }
 
   public setText(newText: string) {

@@ -77,9 +77,14 @@ export class Board {
     const origTile = this.getTile(orig.x, orig.y);
     if (origTile) {
       const unit = origTile.getUnit(playerID, unitID);
-      if (unit && this.isValidMove(playerID, unit, orig, dest)) {
+      if (unit && this.isValidMove(unit, orig, dest)) {
         const destTile = this.getTile(dest.x, dest.y);
-        if (destTile && destTile.canAddUnit(playerID, unit.faceup)) {
+        if (
+          destTile &&
+          destTile.canAddUnit(playerID, unit.faceup) &&
+          origTile.onlyOnePlayerCards(playerID) &&
+          unit.canMove
+        ) {
           origTile.removeUnit(playerID, unitID);
 
           if (destTile.noCards()) {
@@ -98,17 +103,16 @@ export class Board {
     for (let i = 0; i < square.length; i++) {
       const x = square[i]?.x;
       const y = square[i]?.y;
-      if (x && y) {
-        const tile = this.getTile(x, y);
-        if (tile && tile.owner == playerID) {
-          return true;
-        }
+
+      const tile = this.getTile(x, y);
+      if (tile && tile.owner == playerID) {
+        return true;
       }
     }
     return false;
   }
 
-  isValidMove(playerID: string, unit: Unit, orig: Vec2, dest: Vec2): boolean {
+  isValidMove(unit: Unit, orig: Vec2, dest: Vec2): boolean {
     if (dest.x >= 0 && dest.x < BOARD_SIZE && dest.y >= 0 && dest.y < BOARD_SIZE) {
       var isValid = false;
       isValid = orig.isWithinSquare(dest, REG_MOVE);

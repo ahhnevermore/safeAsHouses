@@ -17,6 +17,8 @@ export class selfDTO {
 
 export class unitDTO {
   id: unitID = 0 as unitID;
+  owner: publicID = "" as publicID;
   stack: cardID[] = [];
   faceup: boolean = false;
+  canMove: boolean = false;
 }

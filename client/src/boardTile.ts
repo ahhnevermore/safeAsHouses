@@ -1,7 +1,7 @@
 import * as PIXI from "pixi.js";
-import { colour, publicID } from "../../game/types.js";
+import { coins, colour, publicID } from "../../game/types.js";
 import { BASE_TYPE, isBase, River, RIVER_TYPE, Structure } from "../../game/util.js";
-import { playerDTO } from "../../game/dto.js";
+import { playerDTO, unitDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
 import { BACKGROUND_ALPHA } from "./game.js";
 
@@ -33,6 +33,8 @@ export class BoardTile extends PIXI.Container {
   xIndex: number;
   yIndex: number;
   struct: Structure | null = null;
+  units: Partial<Record<publicID, unitDTO[]>> = {};
+  bets: Partial<Record<publicID, coins>> = {};
 
   constructor(xIndex: number, yIndex: number, size: number) {
     super();
@@ -116,5 +118,18 @@ export class BoardTile extends PIXI.Container {
         console.warn("invalid Layer");
         return this.base;
     }
+  }
+  onlyOnePlayerCards(key: publicID): boolean {
+    const selfCards = this.units[key] ?? [];
+    return (
+      selfCards.length > 0 &&
+      Object.entries(this.units)
+        .filter(([k]) => k !== key)
+        .every(([_, arr]) => (arr ?? []).length === 0) // undefined → []
+    );
+  }
+
+  noCards(): boolean {
+    return Object.values(this.units).every((arr) => !arr || arr.length === 0);
   }
 }

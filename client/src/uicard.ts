@@ -60,6 +60,10 @@ export class UICard extends PIXI.Container {
     this.cardLabel.anchor.set(0.5);
     this.cardLabel.position.set(cardWidth / 2, cardHeight / 2);
     this.face.addChild(this.cardLabel);
+
+    this.interactive = true;
+    this.cursor = "pointer";
+    this.on("pointerdown", () => this.emit("clicked", this));
   }
 
   public show(suit: Suit, rank: Rank) {
