@@ -86,9 +86,12 @@ const hdp_MarginY = 560;
 const SRC_HAND = "handUI";
 const SRC_TILE = "tileUI";
 
+export enum GSig {
+  Add = "addToTile",
+}
+
 const TILE_SIZE = BOARD_WIDTH / BOARD_SIZE;
-export class GameState implements IState {
-  manager: StateManager;
+export class GameState extends PIXI.EventEmitter implements IState {
   container = new PIXI.Container();
   hud: PIXI.Container;
   tileDisplayContainer: PIXI.Container;
@@ -185,9 +188,8 @@ export class GameState implements IState {
     roundEnd: null,
   };
 
-  constructor(stateManager: StateManager) {
-    this.manager = stateManager;
-
+  constructor() {
+    super();
     const board = new PIXI.Sprite(PIXI.Texture.from(ASSETS.gameBoard));
     this.container.addChild(board);
     board.alpha = BACKGROUND_ALPHA;
@@ -675,7 +677,7 @@ export class GameState implements IState {
       colour: ADD_TILE_BTN,
     });
     this.buttons.add.position.set(0, cardY);
-    this.buttons.add.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.add.on("clicked", (btn: UIButton) => this.addButtonClicked(btn));
 
     this.handDisplayContainer.addChild(this.buttons.buy, this.buttons.add);
 
@@ -720,6 +722,11 @@ export class GameState implements IState {
       }
     }
     return false;
+  }
+
+  addButtonClicked(btn: UIButton) {
+    this.updateButtonState(btn);
+    this.emit(GSig.Add );
   }
 }
 

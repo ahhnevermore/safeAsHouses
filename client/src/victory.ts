@@ -2,12 +2,15 @@ import * as PIXI from "pixi.js";
 import { IState, StateManager } from "./stateManager.js";
 import { ClientState } from "../../game/util.js";
 
-export class VictoryState implements IState {
-  container = new PIXI.Container();
-  manager: StateManager;
+export enum VSig {
+  Back = "backToMenu",
+}
 
-  constructor(stateManger: StateManager) {
-    this.manager = stateManger;
+export class VictoryState extends PIXI.EventEmitter implements IState {
+  container = new PIXI.Container();
+
+  constructor() {
+    super();
     const msg = new PIXI.Text({
       text: "Player 1 Wins!",
       style: { fill: 0xffff00, fontSize: 36, fontFamily: "Courier" },
@@ -25,7 +28,7 @@ export class VictoryState implements IState {
     button.eventMode = "static";
     button.cursor = "pointer";
     button.on("pointertap", () => {
-      this.manager.changeState(ClientState.MainMenu);
+      this.emit(VSig.Back);
     });
 
     this.container.addChild(msg, button, btnText);

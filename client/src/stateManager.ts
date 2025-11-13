@@ -2,10 +2,10 @@ import * as PIXI from "pixi.js";
 import { ClientEvents, ServerEvents } from "../../game/events.js";
 import { ClientState } from "../../game/util.js";
 import { Socket } from "socket.io-client";
-import { MainMenuState } from "./mainMenu.js";
+import { MainMenuState, MMSig } from "./mainMenu.js";
 import { LobbyState } from "./lobby.js";
 import { GameState } from "./game.js";
-import { VictoryState } from "./victory.js";
+import { VictoryState, VSig } from "./victory.js";
 
 export interface IState {
   container: PIXI.Container;
@@ -26,12 +26,34 @@ export class StateManager {
     this.app = app;
     this.socket = socket;
     this.registerHandlers(socket);
-    this.victory = new VictoryState(this);
-    this.game = new GameState(this);
-    this.lobby = new LobbyState(this);
-    this.mainMenu = new MainMenuState(this);
+
+    const v = new VictoryState();
+    this.registerVictoryHandlers(v);
+    this.victory = v;
+
+    const g = new GameState();
+    this.registerGameHandlers(g);
+    this.game = g;
+
+    const l = new LobbyState();
+    this.registerLobbyHandlers(l);
+    this.lobby = l;
+
+    const m = new MainMenuState();
+    this.registerMainMenuHandlers(m);
+    this.mainMenu = m;
+
     this.actState = this.mainMenu;
     this.changeState(ClientState.MainMenu);
+  }
+
+  registerGameHandlers(g: GameState) {}
+  registerLobbyHandlers(l: LobbyState) {}
+  registerMainMenuHandlers(m: MainMenuState) {
+    m.on(MMSig.Join, () => this.joinGame());
+  }
+  registerVictoryHandlers(v: VictoryState) {
+    v.on(VSig.Back, () => this.changeState(ClientState.MainMenu));
   }
 
   changeState(clientState: ClientState, props?: Record<string, unknown>) {

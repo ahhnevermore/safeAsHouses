@@ -2,13 +2,12 @@ import * as PIXI from "pixi.js";
 import { IState, StateManager } from "./stateManager.js";
 import { PLAYER_COUNT } from "../../game/util.js";
 
-export class LobbyState implements IState {
+export class LobbyState extends PIXI.EventEmitter implements IState {
   container = new PIXI.Container();
   private text: PIXI.Text;
-  manager: StateManager;
 
-  constructor(stateManager: StateManager) {
-    this.manager = stateManager;
+  constructor() {
+    super();
     this.text = new PIXI.Text({
       text: "Waiting for players: 1/2",
       style: { fill: 0xffffff, fontSize: 24, fontFamily: "Courier" },
