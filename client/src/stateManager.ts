@@ -4,8 +4,9 @@ import { ClientState } from "../../game/util.js";
 import { Socket } from "socket.io-client";
 import { MainMenuState, MMSig } from "./mainMenu.js";
 import { LobbyState } from "./lobby.js";
-import { GameState } from "./game.js";
+import { GameState, GSig } from "./game.js";
 import { VictoryState, VSig } from "./victory.js";
+import { cardID, tileID } from "../../game/types.js";
 
 export interface IState {
   container: PIXI.Container;
@@ -47,10 +48,14 @@ export class StateManager {
     this.changeState(ClientState.MainMenu);
   }
 
-  registerGameHandlers(g: GameState) {}
+  registerGameHandlers(g: GameState) {
+    g.on(GSig.Add, (c: cardID, t: tileID) => {
+      this.socket.emit("placeCard", t, c);
+    });
+  }
   registerLobbyHandlers(l: LobbyState) {}
   registerMainMenuHandlers(m: MainMenuState) {
-    m.on(MMSig.Join, () => this.joinGame());
+    m.on(MMSig.Join, () => this.socket.emit("joinGame"));
   }
   registerVictoryHandlers(v: VictoryState) {
     v.on(VSig.Back, () => this.changeState(ClientState.MainMenu));
@@ -79,10 +84,6 @@ export class StateManager {
     this.actState = newState;
     this.app.stage.addChild(newState.container);
     newState.enter(props);
-  }
-
-  joinGame() {
-    this.socket.emit("joinGame");
   }
 
   registerHandlers(socket: Socket<ServerEvents, ClientEvents>) {

@@ -1,5 +1,5 @@
 import * as PIXI from "pixi.js";
-import { coins, colour, publicID } from "../../game/types.js";
+import { coins, colour, publicID, tileID } from "../../game/types.js";
 import { BASE_TYPE, isBase, River, RIVER_TYPE, Structure } from "../../game/util.js";
 import { playerDTO, unitDTO } from "../../game/dto.js";
 import { ASSETS } from "./loader.js";
@@ -131,5 +131,9 @@ export class BoardTile extends PIXI.Container {
 
   noCards(): boolean {
     return Object.values(this.units).every((arr) => !arr || arr.length === 0);
+  }
+
+  toKey(): tileID {
+    return `${this.xIndex},${this.yIndex}` as tileID;
   }
 }

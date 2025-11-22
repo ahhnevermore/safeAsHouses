@@ -49,7 +49,7 @@ export class Room extends EventEmitter {
   addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
     var player = new Player(socket.id as ID, name, this.players.length.toString() as publicID);
     this.players.push(player);
-    this.board.territory[player.id] = new Set<string>();
+    this.board.territory[player.id] = new Set<tileID>();
 
     socket.join(this.id);
     this.registerHandlers(socket);
@@ -199,17 +199,12 @@ export class Room extends EventEmitter {
       this.sendPlayer(socket.id as ID, "flipRej", tileID, unitID);
     });
 
-    socket.on("placeCard", (tileID: tileID, cardVal: cardID, bet: coins) => {
+    socket.on("placeCard", (tileID: tileID, cardVal: cardID) => {
       const currPlayer = this.getCurrPlayer();
       if (currPlayer && currPlayer.id == socket.id && currPlayer.hasCard(cardVal)) {
         const card = Card.fromKey(cardVal);
         const unit = new Unit(card);
-        let [success, unitSwallowed, unitID] = this.board.placeCard(
-          tileID,
-          unit,
-          socket.id as ID,
-          bet
-        );
+        let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, socket.id as ID);
         if (success) {
           currPlayer.discard(cardVal);
           this.deck.addDiscard(Card.fromKey(cardVal));
@@ -219,38 +214,23 @@ export class Room extends EventEmitter {
               "placeCardPublic",
               currPlayer.publicID,
               tileID,
-              bet,
+
               {
                 unitID: unitID,
                 cardID: cardVal,
               }
             );
           } else {
-            this.sendOtherPlayers(
-              socket.id as ID,
-              "placeCardPublic",
-              currPlayer.publicID,
-              tileID,
-              bet,
-              {
-                unitID: unitID,
-              }
-            );
+            this.sendOtherPlayers(socket.id as ID, "placeCardPublic", currPlayer.publicID, tileID, {
+              unitID: unitID,
+            });
           }
-          this.sendPlayer(
-            socket.id as ID,
-            "placeCardAck",
-            tileID,
-            cardVal,
-            bet,
-            unitID,
-            unitSwallowed
-          );
+          this.sendPlayer(socket.id as ID, "placeCardAck", tileID, cardVal, unitID, unitSwallowed);
           this.startTurnTimer();
           return;
         }
       }
-      this.sendPlayer(socket.id as ID, "placeCardRej", tileID, cardVal, bet);
+      this.sendPlayer(socket.id as ID, "placeCardRej", tileID, cardVal);
     });
 
     socket.on("buyCard", () => {

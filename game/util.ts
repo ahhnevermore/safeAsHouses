@@ -1,4 +1,4 @@
-import { cardID, coins } from "./types.js";
+import { cardID, coins, tileID } from "./types.js";
 
 export const BOARD_SIZE: number = 9;
 export const REG_MOVE: number = 1;
@@ -7,8 +7,8 @@ export const KING_RADIUS: number = 2;
 export const TILE_COINS: coins = 0.1 as coins;
 export const CARD_PRICE: number = 1;
 export const PLAYER_COUNT: number = 4;
-export const RIVERS: string[] = ["4,4"];
-export const BASES: string[] = ["0,0", "8,0", "0,8", "8,8"];
+export const RIVERS: tileID[] = ["4,4" as tileID];
+export const BASES: tileID[] = ["0,0", "8,0", "0,8", "8,8"] as tileID[];
 export const REG_HAND_SIZE: number = 5;
 export const TILE_CARD_LIMIT: number = 5;
 export const TILE_UNIT_LIMIT: number = 5;
@@ -82,11 +82,11 @@ export class Vec2 {
     return tiles;
   }
 
-  toKey(): string {
-    return `${this.x},${this.y}`;
+  toKey(): tileID {
+    return `${this.x},${this.y}` as tileID;
   }
 
-  static fromKey(key: string): Vec2 {
+  static fromKey(key: tileID): Vec2 {
     const [xStr = "0", yStr = "0"] = key.split(",");
     return new Vec2(parseInt(xStr, 10), parseInt(yStr, 10));
   }

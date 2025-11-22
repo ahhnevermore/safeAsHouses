@@ -22,10 +22,19 @@ export class Tile {
     return false;
   }
 
+  raise(playerID: ID, bet: coins) {
+    if (bet > 0) {
+      if (this.bets[playerID]) {
+        this.bets[playerID] = (this.bets[playerID] + bet) as coins;
+      } else {
+        this.bets[playerID] = bet as coins;
+      }
+    }
+  }
+
   placeUnit(
     unit: Unit,
-    playerID: ID,
-    bet: number
+    playerID: ID
   ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: unitID] {
     var territoryCaptured = false;
     var success = false;
@@ -57,13 +66,6 @@ export class Tile {
       this.units[playerID] = [unit];
     }
 
-    if (bet > 0) {
-      if (this.bets[playerID]) {
-        this.bets[playerID] = (this.bets[playerID] + bet) as coins;
-      } else {
-        this.bets[playerID] = bet as coins;
-      }
-    }
     return [success, territoryCaptured, unitSwallowed, unitID];
   }
 
@@ -103,6 +105,4 @@ export class Tile {
     }
     return [];
   }
-
-  
 }

@@ -24,7 +24,7 @@ export class Board {
   );
   rivers: Vec2[] = RIVERS.map((el) => Vec2.fromKey(el));
   bases: Vec2[] = BASES.map((el) => Vec2.fromKey(el));
-  territory: Partial<Record<string, Set<string>>> = {};
+  territory: Partial<Record<ID, Set<tileID>>> = {};
 
   constructor() {
     this.rivers.forEach((elem) => {
@@ -50,18 +50,13 @@ export class Board {
   placeCard(
     tileID: tileID,
     unit: Unit,
-    playerID: ID,
-    bet: number
+    playerID: ID
   ): [success: boolean, unitSwallowed: boolean, unitID: unitID] {
     const xy = Vec2.fromKey(tileID);
     if (this.isValidPlacement(xy, playerID)) {
       const tile = this.getTile(xy.x, xy.y)!;
       if (tile.canAddUnit(playerID, false)) {
-        let [success, territoryCaptured, unitSwallowed, unitID] = tile.placeUnit(
-          unit,
-          playerID,
-          bet
-        );
+        let [success, territoryCaptured, unitSwallowed, unitID] = tile.placeUnit(unit, playerID);
         if (success) {
           if (territoryCaptured) {
             this.capture(playerID, xy);
@@ -224,7 +219,7 @@ export class Board {
       tile.owner = playerID;
       let playerTiles = this.territory[playerID];
       if (!playerTiles) {
-        playerTiles = this.territory[playerID] = new Set<string>();
+        playerTiles = this.territory[playerID] = new Set<tileID>();
       }
       const tileID = tileVec.toKey();
       playerTiles.add(tileID);

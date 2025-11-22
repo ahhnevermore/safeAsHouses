@@ -726,7 +726,10 @@ export class GameState extends PIXI.EventEmitter implements IState {
 
   addButtonClicked(btn: UIButton) {
     this.updateButtonState(btn);
-    this.emit(GSig.Add );
+    const idx = this.handUI.cards.findIndex((card) => card == this.mainUI.selCard);
+    if (this.model.self && this.model.self.hand.length > idx && this.mainUI.selTile) {
+      this.emit(GSig.Add, this.model.self.hand[idx], this.mainUI.selTile.toKey());
+    }
   }
 }
 
