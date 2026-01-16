@@ -1,4 +1,4 @@
-import { cardID, coins, tileID } from "./types.js";
+import { type cardID, type tileID, type unitID, ID, coins } from "./types.js";
 
 export const BOARD_SIZE: number = 9;
 export const REG_MOVE: number = 1;
@@ -111,14 +111,17 @@ export class Card {
   }
 }
 
+export type Structure = River | Base;
+
+
 export class River {
   type: string = RIVER_TYPE;
   turns: number = 0;
-  owner: string | null = null;
+  owner: ID | null = null;
   def: number = 10;
   card: Card | null = null;
   constructor() {}
-  setOwner(owner: string | null) {
+  setOwner(owner: ID | null) {
     this.owner = owner;
   }
   setTurns(turns: number) {
@@ -127,15 +130,24 @@ export class River {
   setCard(card: Card) {
     this.card = card;
   }
+  toJSON() {
+    return {
+      type: this.type,
+      def: this.def,
+      card: this.card?.toKey(),
+      owner: this.owner,
+      turns: this.turns,
+    };
+  }
 }
-
 export class Base {
   type: string = BASE_TYPE;
   def: number = 15;
   constructor() {}
+  toJSON() {
+    return { type: this.type, def: this.def };
+  }
 }
-
-export type Structure = River | Base;
 
 export function isRiver(s: Structure | undefined | null): s is River {
   return !!s && s.type === RIVER_TYPE;

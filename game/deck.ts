@@ -1,18 +1,21 @@
 import { Card } from "./util.js";
 import { Suit } from "./util.js";
+import { cardID } from "./types.js";
 
 export class Deck {
   cards: Card[] = [];
   discards: Card[] = [];
 
-  constructor() {
-    const suits = [Suit.Spades, Suit.Hearts, Suit.Diamonds, Suit.Clubs];
-    for (const suit of suits) {
-      for (let rank = 1; rank <= 13; rank++) {
-        this.cards.push(new Card(suit, rank));
+  constructor(initialize: boolean = true) {
+    if (initialize) {
+      const suits = [Suit.Spades, Suit.Hearts, Suit.Diamonds, Suit.Clubs];
+      for (const suit of suits) {
+        for (let rank = 1; rank <= 13; rank++) {
+          this.cards.push(new Card(suit, rank));
+        }
       }
+      this.shuffle();
     }
-    this.shuffle();
   }
 
   shuffle() {
@@ -42,5 +45,19 @@ export class Deck {
 
   addDiscard(card: Card) {
     this.discards.push(card);
+  }
+
+  toJSON() {
+    return {
+      cards: this.cards.map((c) => c.toKey()),
+      discards: this.discards.map((c) => c.toKey()),
+    };
+  }
+
+  static fromJSON(data: { cards: string[]; discards: string[] }): Deck {
+    const deck = new Deck(false);
+    deck.cards = data.cards.map((key) => Card.fromKey(key as cardID));
+    deck.discards = data.discards.map((key) => Card.fromKey(key as cardID));
+    return deck;
   }
 }

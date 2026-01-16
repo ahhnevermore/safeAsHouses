@@ -19,7 +19,7 @@ import { Server as IOServer, Socket as IOSocket } from "socket.io";
 import { EventEmitter } from "events";
 import { Logger } from "winston";
 import { Unit } from "./unit.js";
-import { cardID, coins, ID, publicID, tileID, unitID } from "./types.js";
+import { cardID, coins, ID, publicID, roomID, tileID, unitID } from "./types.js";
 import { playerDTO } from "./dto.js";
 
 export class Room extends EventEmitter {
@@ -27,7 +27,7 @@ export class Room extends EventEmitter {
   pot: number = 0;
   deck: Deck;
   board: Board;
-  id: string;
+  id: roomID;
   players: Player[] = [];
   actIndex: number = 0;
   turnTimer: NodeJS.Timeout | null = null;
@@ -36,14 +36,26 @@ export class Room extends EventEmitter {
   io: IOServer<ClientEvents, ServerEvents>;
   logger: Logger;
 
-  constructor(ioServer: IOServer<ClientEvents, ServerEvents>, logger: Logger) {
+  constructor(
+    ioServer: IOServer<ClientEvents, ServerEvents>,
+    logger: Logger,
+    initialize: boolean = true
+  ) {
     super();
-    this.deck = new Deck();
-    this.board = new Board();
-    this.id = "room-" + Room.nextID++;
-
     this.io = ioServer;
-    this.logger = logger.child({ roomID: this.id });
+    this.logger = logger;
+
+    if (initialize) {
+      this.deck = new Deck();
+      this.board = new Board();
+      this.id = "room-" + Room.nextID++ as roomID;
+      this.logger = this.logger.child({ roomID: this.id });
+    } else {
+      // If we're not initializing, these will be set by the deserializer
+      this.deck = null as any;
+      this.board = null as any;
+      this.id = "" as roomID;
+    }
   }
 
   addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
@@ -52,7 +64,6 @@ export class Room extends EventEmitter {
     this.board.territory[player.id] = new Set<tileID>();
 
     socket.join(this.id);
-    this.registerHandlers(socket);
     this.logger.info("A user connected:", socket.id);
     this.sendRoom("joinGameAck", this.players.length);
   }
@@ -73,7 +84,7 @@ export class Room extends EventEmitter {
     RIVERS.forEach((r) => {
       const tileVec = Vec2.fromKey(r);
       const tile = this.board.getTile(tileVec.x, tileVec.y);
-      if (tile) {
+      if (tile && tile.structure && isRiver(tile.structure)) {
         if (isRiver(tile.structure)) {
           const dealt = this.deck.deal(1);
           if (dealt.length >= 1) {
@@ -86,7 +97,15 @@ export class Room extends EventEmitter {
     });
     const playerDTOs = this.players.map((pl) => pl.toPlayerDTO());
     this.players.forEach((pl) => {
-      this.sendPlayer(pl.id, "roundStart", playerDTOs, pl.toSelfDTO(), riverCards, true);
+      this.sendPlayer(
+        pl.id,
+        "roundStart",
+        this.id,
+        playerDTOs,
+        pl.toSelfDTO(),
+        riverCards,
+        true
+      );
     });
     this.startTurnTimer();
   }
@@ -153,10 +172,9 @@ export class Room extends EventEmitter {
     signal: E,
     ...args: Parameters<ServerEvents[E]>
   ) {
-    const socket = this.io.sockets.sockets.get(playerID);
-    if (socket) {
-      socket.to(this.id).emit(signal, ...args);
-    }
+    // This is cluster-safe. It tells the redis-adapter to send the message
+    // to everyone in the room `this.id` EXCEPT for the socket with `playerID`.
+    this.io.to(this.id).except(playerID).emit(signal, ...args);
   }
 
   isPlayerTurn(playerID: string): boolean {
@@ -167,6 +185,7 @@ export class Room extends EventEmitter {
     return this.players[this.actIndex];
   }
 
+  /*
   registerHandlers(socket: IOSocket<ClientEvents, ServerEvents>) {
     socket.on("disconnect", () => {
       const dcPlayer = this.players.find((pl) => pl.id == socket.id);
@@ -178,6 +197,13 @@ export class Room extends EventEmitter {
         this.actIndex--;
         this.players = this.players.filter((player) => player.id != socket.id);
         this.logger.info("A user disconnected:", socket.id);
+
+        // If the room is now empty, stop the timer to prevent a crash
+        if (this.players.length === 0 && this.turnTimer) {
+          clearTimeout(this.turnTimer);
+          this.turnTimer = null;
+          this.logger.info("Room is empty, stopping turn timer.");
+        }
       }
     });
 
@@ -204,7 +230,11 @@ export class Room extends EventEmitter {
       if (currPlayer && currPlayer.id == socket.id && currPlayer.hasCard(cardVal)) {
         const card = Card.fromKey(cardVal);
         const unit = new Unit(card);
-        let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, socket.id as ID);
+        let [success, unitSwallowed, unitID] = this.board.placeCard(
+          tileID,
+          unit,
+          socket.id as ID
+        );
         if (success) {
           currPlayer.discard(cardVal);
           this.deck.addDiscard(Card.fromKey(cardVal));
@@ -221,11 +251,24 @@ export class Room extends EventEmitter {
               }
             );
           } else {
-            this.sendOtherPlayers(socket.id as ID, "placeCardPublic", currPlayer.publicID, tileID, {
-              unitID: unitID,
-            });
+            this.sendOtherPlayers(
+              socket.id as ID,
+              "placeCardPublic",
+              currPlayer.publicID,
+              tileID,
+              {
+                unitID: unitID,
+              }
+            );
           }
-          this.sendPlayer(socket.id as ID, "placeCardAck", tileID, cardVal, unitID, unitSwallowed);
+          this.sendPlayer(
+            socket.id as ID,
+            "placeCardAck",
+            tileID,
+            cardVal,
+            unitID,
+            unitSwallowed
+          );
           this.startTurnTimer();
           return;
         }
@@ -240,7 +283,11 @@ export class Room extends EventEmitter {
         if (card) {
           const fee = currPlayer.buyCard(card);
           this.pot += fee;
-          this.sendOtherPlayers(currPlayer.id, "buyCardPublic", currPlayer.publicID);
+          this.sendOtherPlayers(
+            currPlayer.id,
+            "buyCardPublic",
+            currPlayer.publicID
+          );
           this.sendPlayer(currPlayer.id, "buyCardAck", card.toKey());
           return;
         }
@@ -248,4 +295,5 @@ export class Room extends EventEmitter {
       this.sendPlayer(socket.id as ID, "buyCardRej");
     });
   }
+  */
 }

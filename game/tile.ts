@@ -1,6 +1,16 @@
-import { coins, ID, unitID } from "./types.js";
+import { coins, ID, unitID, cardID } from "./types.js";
 import { Unit } from "./unit.js";
-import { Card, Scope, TILE_CARD_LIMIT, TILE_UNIT_LIMIT, type Structure } from "./util.js";
+import {
+  Card,
+  Scope,
+  TILE_CARD_LIMIT,
+  TILE_UNIT_LIMIT,
+  type Structure,
+  River,
+  Base,
+  RIVER_TYPE,
+  BASE_TYPE,
+} from "./util.js";
 
 export class Tile {
   owner: ID | null = null;
@@ -99,10 +109,60 @@ export class Tile {
     this.units[playerID]?.push(unit);
   }
 
-  getMods(playerID: ID, modScope: Scope): Card[] {
-    if (this.units[playerID]) {
-      return this.units[playerID]?.flatMap((unit) => unit.getMod(modScope));
+  getMods(playerID: ID, scope: Scope): Card[] {
+    const playerUnits = this.units[playerID];
+    if (!playerUnits) return [];
+    return playerUnits.flatMap((unit) => unit.getMod(scope));
+  }
+
+  toJSON() {
+    // Serialize units
+    const serializedUnits: Record<string, any> = {};
+    for (const playerID in this.units) {
+      serializedUnits[playerID] = this.units[playerID as ID]?.map((u) => u.toJSON());
     }
-    return [];
+
+    // Serialize structure by delegating to the structure's own toJSON method
+    const serializedStructure = this.structure ? this.structure.toJSON() : null;
+
+    return {
+      owner: this.owner,
+      units: serializedUnits,
+      bets: this.bets,
+      structure: serializedStructure,
+    };
+  }
+
+  static fromJSON(data: any): Tile {
+    const tile = new Tile();
+    tile.owner = data.owner;
+    tile.bets = data.bets;
+
+    // Deserialize units
+    for (const playerID in data.units) {
+      tile.units[playerID as ID] = data.units[playerID].map((uData: any) => Unit.fromJSON(uData));
+    }
+
+    // Deserialize structure
+    if (data.structure) {
+      const structureType = data.structure.type;
+      let structure: Structure | null = null;
+      // We need to import the structure types to reconstruct them
+      if (structureType === RIVER_TYPE) {
+        structure = new River();
+        if (data.structure.card) {
+          (structure as River).setCard(Card.fromKey(data.structure.card as cardID));
+        }
+        (structure as River).owner = data.structure.owner;
+        (structure as River).turns = data.structure.turns;
+      } else if (structureType === BASE_TYPE) {
+        structure = new Base();
+      }
+      if (structure) {
+        tile.setStructure(structure);
+      }
+    }
+
+    return tile;
   }
 }

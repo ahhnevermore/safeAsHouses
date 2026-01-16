@@ -32,6 +32,16 @@ export class Player {
     this.hand = this.hand.filter((card) => card.toKey() != cardVal);
   }
 
+  toJSON() {
+    return {
+      id: this.id,
+      publicID: this.publicID,
+      name: this.name,
+      coins: this.coins,
+      hand: this.hand.map((c) => c.toKey()),
+    };
+  }
+
   toPlayerDTO(): playerDTO {
     return {
       id: this.publicID,

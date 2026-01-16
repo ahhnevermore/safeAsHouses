@@ -6,7 +6,7 @@ import { MainMenuState, MMSig } from "./mainMenu.js";
 import { LobbyState } from "./lobby.js";
 import { GameState, GSig } from "./game.js";
 import { VictoryState, VSig } from "./victory.js";
-import { cardID, tileID } from "../../game/types.js";
+import { cardID, roomID, tileID } from "../../game/types.js";
 
 export interface IState {
   container: PIXI.Container;
@@ -49,9 +49,7 @@ export class StateManager {
   }
 
   registerGameHandlers(g: GameState) {
-    g.on(GSig.Add, (c: cardID, t: tileID) => {
-      this.socket.emit("placeCard", t, c);
-    });
+    // Listeners are now registered dynamically in changeState
   }
   registerLobbyHandlers(l: LobbyState) {}
   registerMainMenuHandlers(m: MainMenuState) {
@@ -61,29 +59,39 @@ export class StateManager {
     v.on(VSig.Back, () => this.changeState(ClientState.MainMenu));
   }
 
-  changeState(clientState: ClientState, props?: Record<string, unknown>) {
+  changeState(newState: ClientState, props?: any) {
     if (this.actState) {
+      if (this.actState == this.game) {
+        this.game.removeAllListeners();
+      }
       this.app.stage.removeChild(this.actState.container);
-      this.actState.exit();
     }
-    let newState: IState;
-    switch (clientState) {
+
+    switch (newState) {
       case ClientState.MainMenu:
-        newState = this.mainMenu;
+        this.actState = this.mainMenu;
+        this.mainMenu.enter();
         break;
       case ClientState.Lobby:
-        newState = this.lobby;
+        this.actState = this.lobby;
+        this.lobby.enter(props);
         break;
       case ClientState.Game:
-        newState = this.game;
+        const g = this.game;
+        g.on(GSig.Add, (c: cardID, t: tileID) => {
+          this.socket.emit("placeCard", g.model.roomId, t, c);
+        });
+        g.on(GSig.Submit, () => {
+          this.socket.emit("submitTurn", g.model.roomId);
+        });
+        this.actState = this.game;
         break;
       case ClientState.Victory:
-        newState = this.victory;
+        this.actState = this.victory;
+        this.victory.enter();
         break;
     }
-    this.actState = newState;
-    this.app.stage.addChild(newState.container);
-    newState.enter(props);
+    this.app.stage.addChild(this.actState.container);
   }
 
   registerHandlers(socket: Socket<ServerEvents, ClientEvents>) {
@@ -91,10 +99,10 @@ export class StateManager {
       this.changeState(ClientState.Lobby, { actPlayers: numPlayers })
     );
 
-    socket.on("roundStart", (playerDTOs, selfDTO, riverCards, gameStart) => {
+    socket.on("roundStart", (roomId, playerDTOs, selfDTO, riverCards, gameStart) => {
       this.changeState(ClientState.Game);
       if (gameStart) {
-        this.game.initializeGame(playerDTOs, selfDTO, riverCards);
+        this.game.initializeGame(roomId, playerDTOs, selfDTO, riverCards);
       }
     });
 

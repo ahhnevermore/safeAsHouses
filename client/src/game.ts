@@ -23,7 +23,7 @@ import { ASSETS } from "./loader.js";
 import { BoardTile, Layer } from "./boardTile.js";
 import { UIButton } from "./uibutton.js";
 import { UICard } from "./uicard.js";
-import { cardID, coins, colour, publicID } from "../../game/types.js";
+import { cardID, coins, colour, publicID, roomID } from "../../game/types.js";
 import { UIUnit } from "./uiunit.js";
 
 enum ActiveAction {
@@ -88,6 +88,7 @@ const SRC_TILE = "tileUI";
 
 export enum GSig {
   Add = "addToTile",
+  Submit = "submitTurn",
 }
 
 const TILE_SIZE = BOARD_WIDTH / BOARD_SIZE;
@@ -98,6 +99,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
   handDisplayContainer: PIXI.Container;
 
   model: {
+    roomId: roomID;
     myTurn: boolean;
     timeLeft: number;
     actPlayerID: publicID;
@@ -107,6 +109,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
     actAction: ActiveAction;
     votedEnd: boolean;
   } = {
+    roomId: "" as roomID, 
     myTurn: false,
     timeLeft: 0,
     actPlayerID: "" as publicID,
@@ -267,6 +270,14 @@ export class GameState extends PIXI.EventEmitter implements IState {
     }
 
     if (clickedButton) {
+      // Logic for emitting events based on which button was clicked
+      switch (clickedButton.name) {
+        case BtnName.submit:
+          this.emit(GSig.Submit);
+          break;
+        // TODO: Add cases for other buttons like flip, placeCard, etc.
+      }
+
       Object.values(this.buttons)
         .filter((btn) => btn && btn.name != clickedButton.name)
         .forEach((btn) => {
@@ -392,7 +403,13 @@ export class GameState extends PIXI.EventEmitter implements IState {
     this.updateButtonState();
   }
 
-  initializeGame(playerDTOs: playerDTO[], selfDTO: selfDTO, riverCards: cardID[]) {
+  initializeGame(
+    roomId: roomID,
+    playerDTOs: playerDTO[],
+    selfDTO: selfDTO,
+    riverCards: cardID[]
+  ) {
+    this.model.roomId = roomId;
     this.model.players = playerDTOs;
     this.model.self = selfDTO;
     this.setupTileDisplay();
@@ -400,18 +417,26 @@ export class GameState extends PIXI.EventEmitter implements IState {
     this.setupPlayerBases();
     this.updateRivers(riverCards);
     this.updateHandDisplay(selfDTO.hand);
-    this.onTileClicked(this.mainUI.tiles[0][0]);
+    const initialTile = this.mainUI.tiles[0]?.[0];
+    if (initialTile) {
+      this.onTileClicked(initialTile);
+    }
   }
 
   updateRivers(riverCards: cardID[]) {
     RIVERS.forEach((r, i) => {
       const tileVec = Vec2.fromKey(r);
       const tile = this.mainUI.tiles[tileVec.x][tileVec.y];
-      if (tile && isRiver(tile.struct) && i < riverCards.length) {
-        const card = Card.fromKey(riverCards[i]);
+      if (tile && tile.struct && isRiver(tile.struct) && i < riverCards.length) {
+        const card = Card.fromKey(riverCards[i]!);
         tile.struct.setCard(card);
       }
     });
+
+    // Re-select the currently selected tile to force a UI refresh
+    if (this.mainUI.selTile) {
+      this.selectTile(this.mainUI.selTile);
+    }
   }
   setupPlayerBases() {
     this.model.players.forEach((pl, i) => {

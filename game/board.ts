@@ -26,20 +26,22 @@ export class Board {
   bases: Vec2[] = BASES.map((el) => Vec2.fromKey(el));
   territory: Partial<Record<ID, Set<tileID>>> = {};
 
-  constructor() {
-    this.rivers.forEach((elem) => {
-      const tile = this.getTile(elem.x, elem.y);
-      if (tile) {
-        tile.setStructure(new River());
-      }
-    });
+  constructor(initialize: boolean = true) {
+    if (initialize) {
+      this.rivers.forEach((elem) => {
+        const tile = this.getTile(elem.x, elem.y);
+        if (tile) {
+          tile.setStructure(new River());
+        }
+      });
 
-    this.bases.forEach((base) => {
-      const tile = this.getTile(base.x, base.y);
-      if (tile) {
-        tile.setStructure(new Base());
-      }
-    });
+      this.bases.forEach((base) => {
+        const tile = this.getTile(base.x, base.y);
+        if (tile) {
+          tile.setStructure(new Base());
+        }
+      });
+    }
   }
 
   getTile(x: number, y: number): Tile | undefined {
@@ -130,7 +132,7 @@ export class Board {
   updateRivers() {
     this.rivers.forEach((xy) => {
       const tile = this.getTile(xy.x, xy.y)!;
-      if (tile.owner != null && isRiver(tile.structure)) {
+      if (tile?.owner != null && tile.structure && isRiver(tile.structure)) {
         if (tile.structure.owner == tile.owner) {
           tile.structure.turns++;
         } else {
@@ -160,7 +162,7 @@ export class Board {
     for (var i = 0; i < this.rivers.length; i++) {
       const xy = this.rivers[i]!;
       const tile = this.getTile(xy.x, xy.y);
-      if (tile && isRiver(tile.structure) && tile.structure.turns >= 10) {
+      if (tile && tile.structure && isRiver(tile.structure) && tile.structure.turns >= 10) {
         return tile.structure.owner;
       }
     }
@@ -210,6 +212,39 @@ export class Board {
       }
     }
     return false;
+  }
+
+  toJSON() {
+    // Convert territory Set to Array for serialization
+    const serializedTerritory: Record<string, tileID[]> = {};
+    for (const playerID in this.territory) {
+      const tileSet = this.territory[playerID as ID];
+      if (tileSet) {
+        serializedTerritory[playerID] = Array.from(tileSet);
+      }
+    }
+
+    return {
+      grid: this.grid.map((row) => row.map((tile) => tile.toJSON())),
+      territory: serializedTerritory,
+    };
+  }
+
+  static fromJSON(data: any): Board {
+    const board = new Board(false);
+
+    // Deserialize grid
+    board.grid = data.grid.map((row: any[]) =>
+      row.map((tileData: any) => Tile.fromJSON(tileData))
+    );
+
+    // Deserialize territory
+    for (const playerID in data.territory) {
+      const tileArray = data.territory[playerID];
+      board.territory[playerID as ID] = new Set(tileArray);
+    }
+
+    return board;
   }
 
   capture(playerID: ID, tileVec: Vec2) {

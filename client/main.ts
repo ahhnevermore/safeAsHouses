@@ -22,7 +22,9 @@ import { loadAssets } from "./src/loader.js";
 
   document.body.appendChild(app.canvas);
 
-  const socket: Socket<ServerEvents, ClientEvents> = io();
+  const socket: Socket<ServerEvents, ClientEvents> = io({
+    transports: ["websocket"],
+  });
   socket.on("connect", () => {
     console.log("Connected as", socket.id);
   });

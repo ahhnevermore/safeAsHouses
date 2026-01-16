@@ -1,12 +1,12 @@
 import { playerDTO, selfDTO } from "./dto.js";
-import { cardID, coins, publicID, tileID, unitID } from "./types.js";
+import { cardID, coins, publicID, roomID, tileID, unitID } from "./types.js";
 
 export type ClientEvents = {
-  flip: (tileID: tileID, unitID: unitID) => void;
-  submitTurn: () => void;
-  placeCard: (tileID: tileID, cardVal: cardID) => void;
-  buyCard: () => void;
   joinGame: () => void;
+  submitTurn: (roomID: roomID) => void;
+  flip: (roomID: roomID, tileID: tileID, unitID: unitID) => void;
+  placeCard: (roomID: roomID, tileID: tileID, cardVal: cardID) => void;
+  buyCard: (roomID: roomID) => void;
 };
 
 export type ServerEvents = {
@@ -29,6 +29,12 @@ export type ServerEvents = {
   raisePublic: (publicID: publicID, tileID: tileID, bet: coins) => void;
   raiseRej: (tileID: tileID, bet: coins) => void;
   joinGameAck: (numPlayers: number) => void;
-  roundStart: (playerList: playerDTO[], dto: selfDTO, river: cardID[], gameStart?: boolean) => void;
+  roundStart: (
+    roomID: roomID,
+    playerDTOs: playerDTO[],
+    selfDTO: selfDTO,
+    riverCards: cardID[],
+    gameStart: boolean
+  ) => void;
   dcPlayer: (publicID: publicID) => void;
 };
