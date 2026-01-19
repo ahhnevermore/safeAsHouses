@@ -41,7 +41,7 @@ export function serializeRoomState(room: Room): string {
 export function deserializeRoomState(
   json: string,
   io: Server<ClientEvents, ServerEvents>,
-  logger: Logger
+  logger: Logger,
 ): Room {
   const data: SerializedRoom = JSON.parse(json);
 
@@ -70,10 +70,7 @@ export function deserializeRoomState(
 /**
  * Save room state to Redis
  */
-export async function saveRoomState(
-  redis: RedisClientType<any>,
-  room: Room
-): Promise<void> {
+export async function saveRoomState(redis: RedisClientType<any>, room: Room): Promise<void> {
   const serialized = serializeRoomState(room);
   // Store with 24-hour expiration (prevents orphaned rooms)
   // The room ID returned by the matchmaking Lua script already contains the
@@ -88,7 +85,7 @@ export async function loadRoom(
   redis: RedisClientType<any>,
   roomId: roomID,
   io: Server<ClientEvents, ServerEvents>,
-  logger: Logger
+  logger: Logger,
 ): Promise<Room | null> {
   // roomId is expected to be the full Redis key (e.g. 'room:12345-6789')
   const json = await redis.get(roomId);

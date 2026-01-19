@@ -25,7 +25,7 @@ import {
 import cors from "cors";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "your-super-secret-session-key"; //TODO
-const COOKIE_NAME =  "s4feashouses.sid";
+const COOKIE_NAME = "s4feashouses.sid";
 
 const logger = createLogger({
   level: process.env.NODE_ENV === "production" ? "info" : "debug",
@@ -44,10 +44,12 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(express.static("public"));
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    credentials: true,
+  }),
+);
 
 const server = createServer(app);
 const io = new Server<ClientEvents, ServerEvents>(server, {
@@ -116,9 +118,9 @@ async function startWorker() {
     // data lives at 'room:room:123'. Only rename when the target key doesn't
     // already exist to avoid clobbering.
     try {
-      const legacyKeys = await redisClient.keys('room:room:*');
+      const legacyKeys = await redisClient.keys("room:room:*");
       for (const legacy of legacyKeys) {
-        const migrated = legacy.replace(/^room:/, '');
+        const migrated = legacy.replace(/^room:/, "");
         const exists = await redisClient.exists(migrated);
         if (!exists) {
           const val = await redisClient.get(legacy);
@@ -132,7 +134,7 @@ async function startWorker() {
         }
       }
     } catch (err) {
-      logger.error('Error during Redis legacy key migration:', err);
+      logger.error("Error during Redis legacy key migration:", err);
     }
     // Handle server-side requests to remotely join a socket to a room.
     // We use serverSideEmit to notify all workers; the worker owning the socket
@@ -162,7 +164,7 @@ async function startWorker() {
     io.use((socket, next) => {
       // This is a wrapper to allow express-session to work with Socket.IO
       // @ts-ignore
-      sessionMiddleware(socket.request, {}, ()=>{
+      sessionMiddleware(socket.request, {}, () => {
         //@ts-ignore
         logger.debug("Session in socket:", socket.request.session);
         next();
@@ -202,15 +204,14 @@ async function startWorker() {
               userSockets.delete(userId);
             }
           }
-          
+
           // Redis cleanup
           await redisClient.eval(CLEANUP_USER_LUA, {
             keys: [`userSockets:${userId}`],
             arguments: [socket.id],
           });
 
-            logger.info(`User ${userId} disconnected on socket ${socket.id} `);
-          
+          logger.info(`User ${userId} disconnected on socket ${socket.id} `);
         }
       });
 
@@ -231,7 +232,7 @@ async function startWorker() {
 
           const [matchType, roomId, ...rest] = res as [string, roomID, ...any[]];
 
-          if (matchType === 'RECONNECT') {
+          if (matchType === "RECONNECT") {
             const socketIds = rest[0] as string[];
             const existingRoom = await loadRoom(redisClient as any, roomId, io, logger);
             if (existingRoom) {
@@ -243,18 +244,22 @@ async function startWorker() {
               socket.request.session.touch();
               existingRoom.sendReconnectionState(userId);
             } else {
-               await redisClient.del(`${USER_TO_ROOM_PREFIX}${userId}`);
-               logger.warn(`User ${userId} tried to reconnect to non-existent room ${roomId}. Stale mapping deleted.`);
+              await redisClient.del(`${USER_TO_ROOM_PREFIX}${userId}`);
+              logger.warn(
+                `User ${userId} tried to reconnect to non-existent room ${roomId}. Stale mapping deleted.`,
+              );
             }
-            return; 
+            return;
           }
 
-          if (matchType === 'MATCH') {
+          if (matchType === "MATCH") {
             const newPlayerCountStr = rest[0] as string;
             const socketIds = rest[1] as string[];
             const newPlayerCount = parseInt(newPlayerCountStr, 10);
             let room: Room | null;
-            logger.info(`MATCH response for user ${userId}: room=${roomId} players=${newPlayerCount}`);
+            logger.info(
+              `MATCH response for user ${userId}: room=${roomId} players=${newPlayerCount}`,
+            );
 
             if (newPlayerCount === 1) {
               room = new Room(io, logger);
@@ -263,27 +268,31 @@ async function startWorker() {
             } else {
               room = await waitAndLoadRoom(roomId);
               if (!room) {
-                logger.error(`Failed to load room ${roomId} after waiting. Matchmaking may be inconsistent.`);
+                logger.error(
+                  `Failed to load room ${roomId} after waiting. Matchmaking may be inconsistent.`,
+                );
                 return;
               }
               logger.info(`Loaded room ${roomId} from Redis on worker ${process.pid}`);
             }
             let playerCount;
-            playerCount =room.addPlayer(userId, username);
+            playerCount = room.addPlayer(userId, username);
 
             logger.info("User added:", userId);
-            
+
             for (const socketId of socketIds) {
               io.of("/").serverSideEmit("remoteJoin", socketId, roomId);
             }
 
-            logger.info(`User ${userId} joined room ${roomId}. Room now has ${newPlayerCount} players.`);
-            
+            logger.info(
+              `User ${userId} joined room ${roomId}. Room now has ${newPlayerCount} players.`,
+            );
+
             if (newPlayerCount === MAX_PLAYERS) {
               logger.info(`Room ${room.id} is full, starting game...`);
               room.startGame();
             }
-            
+
             // The state must always be saved after a player is added or the game starts.
             try {
               await saveRoomState(redisClient as any, room);
@@ -312,7 +321,7 @@ async function startWorker() {
               // We have the raw room data, so we can deserialize it directly instead of calling loadRoom.
               const room = Room.deserialize(roomData, io, logger);
               room.id = roomId;
-              
+
               await handler(room, ...args);
               await saveRoomState(redisClient as any, room);
             } else {
@@ -324,12 +333,15 @@ async function startWorker() {
         };
       };
 
-      socket.on("submitTurn", withRoom(async (room) => {
-        // The handler now correctly receives the room object.
-        if (room.isPlayerTurn(socket.data.userId)) {
-          room.advanceTurn();
-        }
-      }));
+      socket.on(
+        "submitTurn",
+        withRoom(async (room) => {
+          // The handler now correctly receives the room object.
+          if (room.isPlayerTurn(socket.data.userId)) {
+            room.advanceTurn();
+          }
+        }),
+      );
     });
 
     const PORT = process.env.PORT || 3000;
@@ -354,7 +366,9 @@ if (useCluster && cluster.isPrimary) {
   }
 
   cluster.on("exit", (worker, code, signal) => {
-    logger.warn(`Worker ${worker.process.pid} exited (code=${code} signal=${signal}), restarting...`);
+    logger.warn(
+      `Worker ${worker.process.pid} exited (code=${code} signal=${signal}), restarting...`,
+    );
     cluster.fork();
   });
 } else {
