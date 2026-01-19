@@ -99,7 +99,6 @@ export class GameState extends PIXI.EventEmitter implements IState {
   handDisplayContainer: PIXI.Container;
 
   model: {
-    roomId: roomID;
     myTurn: boolean;
     timeLeft: number;
     actPlayerID: publicID;
@@ -109,7 +108,6 @@ export class GameState extends PIXI.EventEmitter implements IState {
     actAction: ActiveAction;
     votedEnd: boolean;
   } = {
-    roomId: "" as roomID, 
     myTurn: false,
     timeLeft: 0,
     actPlayerID: "" as publicID,
@@ -404,12 +402,10 @@ export class GameState extends PIXI.EventEmitter implements IState {
   }
 
   initializeGame(
-    roomId: roomID,
     playerDTOs: playerDTO[],
     selfDTO: selfDTO,
     riverCards: cardID[]
   ) {
-    this.model.roomId = roomId;
     this.model.players = playerDTOs;
     this.model.self = selfDTO;
     this.setupTileDisplay();

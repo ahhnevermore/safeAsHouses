@@ -58,14 +58,75 @@ export class Room extends EventEmitter {
     }
   }
 
-  addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
-    var player = new Player(socket.id as ID, name, this.players.length.toString() as publicID);
+  static deserialize(
+    json: string,
+    ioServer: IOServer<ClientEvents, ServerEvents>,
+    logger: Logger
+  ): Room {
+    const data = JSON.parse(json);
+    const room = new Room(ioServer, logger, false);
+
+    room.id = data.id;
+    room.pot = data.pot;
+    room.actIndex = data.actIndex;
+
+    room.deck = Deck.fromJSON(data.deck);
+    room.board = Board.fromJSON(data.board);
+    room.players = data.players.map((p: any) => Player.fromJSON(p));
+
+    return room;
+  }
+
+  addPlayer(userId: ID, name: string):number {
+    var player = new Player(userId, name, this.players.length.toString() as publicID);
     this.players.push(player);
     this.board.territory[player.id] = new Set<tileID>();
 
-    socket.join(this.id);
-    this.logger.info("A user connected:", socket.id);
-    this.sendRoom("joinGameAck", this.players.length);
+    return this.players.length;
+  }
+
+  getPlayerByUserId(userId: ID): Player | undefined {
+    return this.players.find((pl) => pl.id === userId);
+  }
+
+  sendReconnectionState(userId: ID) {
+    const player = this.getPlayerByUserId(userId);
+    if (!player) return;
+
+    const playerDTOs = this.players.map((pl) => pl.toPlayerDTO());
+    const riverCards: cardID[] = [];
+    
+    // Gather all current river cards
+    RIVERS.forEach((r) => {
+      const tileVec = Vec2.fromKey(r);
+      const tile = this.board.getTile(tileVec.x, tileVec.y);
+      if (tile && tile.structure && isRiver(tile.structure)) {
+        const card = (tile.structure as River).card;
+        if (card) {
+          riverCards.push(card.toKey());
+        }
+      }
+    });
+
+    // Send the current game state to the reconnecting player
+    this.sendPlayer(
+      userId,
+      "roundStart",
+      playerDTOs,
+      player.toSelfDTO(),
+      riverCards,
+      false // Not a fresh game start, just a reconnection
+    );
+
+    // If it's this player's turn, send them the turn notification
+    if (this.isPlayerTurn(userId)) {
+      this.sendPlayer(userId, "yourTurn", player.publicID, this.turnDuration);
+    } else {
+      const actPlayer = this.getCurrPlayer();
+      if (actPlayer) {
+        this.sendPlayer(userId, "waitTurn", actPlayer.publicID, this.turnDuration);
+      }
+    }
   }
 
   isRoomFull() {
@@ -100,7 +161,6 @@ export class Room extends EventEmitter {
       this.sendPlayer(
         pl.id,
         "roundStart",
-        this.id,
         playerDTOs,
         pl.toSelfDTO(),
         riverCards,
