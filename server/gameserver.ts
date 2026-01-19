@@ -110,10 +110,46 @@ async function startWorker() {
     await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
     logger.info(`Worker ${process.pid} connected to Redis and using adapter`);
+    // One-time cleanup: if any older keys were stored with a double 'room:room:'
+    // prefix (from older code), try to migrate them to 'room:...'. This avoids
+    // load mismatches where a user mapping points to 'room:123' but the actual
+    // data lives at 'room:room:123'. Only rename when the target key doesn't
+    // already exist to avoid clobbering.
+    try {
+      const legacyKeys = await redisClient.keys('room:room:*');
+      for (const legacy of legacyKeys) {
+        const migrated = legacy.replace(/^room:/, '');
+        const exists = await redisClient.exists(migrated);
+        if (!exists) {
+          const val = await redisClient.get(legacy);
+          if (val !== null) {
+            await redisClient.set(migrated, val);
+            await redisClient.del(legacy);
+            logger.info(`Migrated legacy Redis key ${legacy} -> ${migrated}`);
+          }
+        } else {
+          logger.warn(`Skipping migration for ${legacy}, target ${migrated} already exists`);
+        }
+      }
+    } catch (err) {
+      logger.error('Error during Redis legacy key migration:', err);
+    }
+    // Handle server-side requests to remotely join a socket to a room.
+    // We use serverSideEmit to notify all workers; the worker owning the socket
+    // will perform the actual join when it receives the event.
+    io.of("/").on("remoteJoin", (socketId: string, roomId: roomID) => {
+      const target = io.of("/").sockets.get(socketId);
+      if (target) {
+        target.join(roomId);
+        logger.debug(`Performed local join for socket ${socketId} into room ${roomId}`);
+      }
+    });
 
     const userSockets = new Map<ID, Set<Socket>>();
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-    const waitAndLoadRoom = async (roomId: roomID, attempts = 10, delay = 50) => {
+    // Give other workers a bit more time to create and persist the Room state
+    // before we give up. This helps avoid race conditions during matchmaking.
+    const waitAndLoadRoom = async (roomId: roomID, attempts = 20, delay = 100) => {
       for (let i = 0; i < attempts; i++) {
         const r = await loadRoom(redisClient as any, roomId, io, logger);
         if (r) return r;
@@ -200,7 +236,7 @@ async function startWorker() {
             const existingRoom = await loadRoom(redisClient as any, roomId, io, logger);
             if (existingRoom) {
               for (const socketId of socketIds) {
-               io.to(socketId).socketsJoin(roomId);
+                io.of("/").serverSideEmit("remoteJoin", socketId, roomId);
               }
               logger.info(`User ${userId} reconnected to existing room ${existingRoom.id}`);
               // @ts-ignore - Touch the session to reset the expiration timer
@@ -218,16 +254,19 @@ async function startWorker() {
             const socketIds = rest[1] as string[];
             const newPlayerCount = parseInt(newPlayerCountStr, 10);
             let room: Room | null;
+            logger.info(`MATCH response for user ${userId}: room=${roomId} players=${newPlayerCount}`);
 
             if (newPlayerCount === 1) {
               room = new Room(io, logger);
               room.id = roomId;
+              logger.info(`Created Room instance for ${roomId} on worker ${process.pid}`);
             } else {
               room = await waitAndLoadRoom(roomId);
               if (!room) {
                 logger.error(`Failed to load room ${roomId} after waiting. Matchmaking may be inconsistent.`);
                 return;
               }
+              logger.info(`Loaded room ${roomId} from Redis on worker ${process.pid}`);
             }
             let playerCount;
             playerCount =room.addPlayer(userId, username);
@@ -235,7 +274,7 @@ async function startWorker() {
             logger.info("User added:", userId);
             
             for (const socketId of socketIds) {
-             io.to(socketId).socketsJoin(roomId);
+              io.of("/").serverSideEmit("remoteJoin", socketId, roomId);
             }
 
             logger.info(`User ${userId} joined room ${roomId}. Room now has ${newPlayerCount} players.`);
@@ -246,7 +285,12 @@ async function startWorker() {
             }
             
             // The state must always be saved after a player is added or the game starts.
-            await saveRoomState(redisClient as any, room);
+            try {
+              await saveRoomState(redisClient as any, room);
+              logger.info(`Saved room state for ${room.id}`);
+            } catch (err) {
+              logger.error(`Failed to save room ${room.id}:`, err);
+            }
             room.sendRoom("joinGameAck", playerCount);
           }
         } catch (err) {

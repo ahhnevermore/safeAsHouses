@@ -76,7 +76,9 @@ export async function saveRoomState(
 ): Promise<void> {
   const serialized = serializeRoomState(room);
   // Store with 24-hour expiration (prevents orphaned rooms)
-  await redis.set(`room:${room.id}`, serialized, { EX: 86400 });
+  // The room ID returned by the matchmaking Lua script already contains the
+  // 'room:' prefix, so use the room.id as the full key to avoid double-prefixing.
+  await redis.set(room.id, serialized, { EX: 86400 });
 }
 
 /**
@@ -88,7 +90,8 @@ export async function loadRoom(
   io: Server<ClientEvents, ServerEvents>,
   logger: Logger
 ): Promise<Room | null> {
-  const json = await redis.get(`room:${roomId}`);
+  // roomId is expected to be the full Redis key (e.g. 'room:12345-6789')
+  const json = await redis.get(roomId);
   if (!json) {
     return null;
   }
@@ -99,5 +102,5 @@ export async function loadRoom(
  * Delete room state from Redis (cleanup after game ends)
  */
 export async function deleteRoom(redis: RedisClientType<any>, roomId: string): Promise<void> {
-  await redis.del(`room:${roomId}`);
+  await redis.del(roomId);
 }
