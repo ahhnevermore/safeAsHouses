@@ -14,6 +14,7 @@ interface SerializedRoom {
   pot: number;
   actIndex: number;
   turnDuration: number;
+  gameStarted: boolean;
   players: ReturnType<Player["toJSON"]>[];
   deck: ReturnType<Deck["toJSON"]>;
   board: ReturnType<Board["toJSON"]>;
@@ -28,6 +29,7 @@ export function serializeRoomState(room: Room): string {
     pot: room.pot,
     actIndex: room.actIndex,
     turnDuration: room.turnDuration,
+    gameStarted: room.gameStarted,
     players: room.players.map((p) => p.toJSON()),
     deck: room.deck.toJSON(),
     board: room.board.toJSON(),
@@ -41,7 +43,7 @@ export function serializeRoomState(room: Room): string {
 export function deserializeRoomState(
   json: string,
   io: Server<ClientEvents, ServerEvents>,
-  logger: Logger
+  logger: Logger,
 ): Room {
   const data: SerializedRoom = JSON.parse(json);
 
@@ -53,6 +55,7 @@ export function deserializeRoomState(
   room.pot = data.pot;
   room.actIndex = data.actIndex;
   room.turnDuration = data.turnDuration;
+  room.gameStarted = data.gameStarted || false;
   room.deck = Deck.fromJSON(data.deck);
   room.board = Board.fromJSON(data.board);
 
@@ -70,13 +73,10 @@ export function deserializeRoomState(
 /**
  * Save room state to Redis
  */
-export async function saveRoomState(
-  redis: RedisClientType<any>,
-  room: Room
-): Promise<void> {
+export async function saveRoomState(redis: RedisClientType<any>, room: Room): Promise<void> {
   const serialized = serializeRoomState(room);
   // Store with 24-hour expiration (prevents orphaned rooms)
-  await redis.set(`room:${room.id}`, serialized, { EX: 86400 });
+  await redis.set(room.id, serialized, { EX: 86400 });
 }
 
 /**
@@ -86,9 +86,9 @@ export async function loadRoom(
   redis: RedisClientType<any>,
   roomId: roomID,
   io: Server<ClientEvents, ServerEvents>,
-  logger: Logger
+  logger: Logger,
 ): Promise<Room | null> {
-  const json = await redis.get(`room:${roomId}`);
+  const json = await redis.get(roomId);
   if (!json) {
     return null;
   }
@@ -99,5 +99,5 @@ export async function loadRoom(
  * Delete room state from Redis (cleanup after game ends)
  */
 export async function deleteRoom(redis: RedisClientType<any>, roomId: string): Promise<void> {
-  await redis.del(`room:${roomId}`);
+  await redis.del(roomId);
 }

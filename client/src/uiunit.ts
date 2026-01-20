@@ -10,6 +10,6 @@ export class UIUnit extends PIXI.Container {
   }
 
   show(dto: unitDTO) {
-    this.model = dto; 
+    this.model = dto;
   }
 }

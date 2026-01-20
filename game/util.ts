@@ -113,7 +113,6 @@ export class Card {
 
 export type Structure = River | Base;
 
-
 export class River {
   type: string = RIVER_TYPE;
   turns: number = 0;

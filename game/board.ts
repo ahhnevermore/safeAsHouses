@@ -20,7 +20,7 @@ import { coins, ID, tileID, unitID } from "./types.js";
 
 export class Board {
   grid: Tile[][] = Array.from({ length: BOARD_SIZE }, () =>
-    Array.from({ length: BOARD_SIZE }, () => new Tile())
+    Array.from({ length: BOARD_SIZE }, () => new Tile()),
   );
   rivers: Vec2[] = RIVERS.map((el) => Vec2.fromKey(el));
   bases: Vec2[] = BASES.map((el) => Vec2.fromKey(el));
@@ -52,7 +52,7 @@ export class Board {
   placeCard(
     tileID: tileID,
     unit: Unit,
-    playerID: ID
+    playerID: ID,
   ): [success: boolean, unitSwallowed: boolean, unitID: unitID] {
     const xy = Vec2.fromKey(tileID);
     if (this.isValidPlacement(xy, playerID)) {
@@ -234,9 +234,7 @@ export class Board {
     const board = new Board(false);
 
     // Deserialize grid
-    board.grid = data.grid.map((row: any[]) =>
-      row.map((tileData: any) => Tile.fromJSON(tileData))
-    );
+    board.grid = data.grid.map((row: any[]) => row.map((tileData: any) => Tile.fromJSON(tileData)));
 
     // Deserialize territory
     for (const playerID in data.territory) {

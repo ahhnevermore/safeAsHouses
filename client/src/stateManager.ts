@@ -53,7 +53,10 @@ export class StateManager {
   }
   registerLobbyHandlers(l: LobbyState) {}
   registerMainMenuHandlers(m: MainMenuState) {
-    m.on(MMSig.Join, () => this.socket.emit("joinGame"));
+    m.on(MMSig.Join, () => {
+      const username = `Player_${Math.random().toString(36).substring(7)}`;
+      this.socket.emit("joinGame", username);
+    });
   }
   registerVictoryHandlers(v: VictoryState) {
     v.on(VSig.Back, () => this.changeState(ClientState.MainMenu));
@@ -74,15 +77,15 @@ export class StateManager {
         break;
       case ClientState.Lobby:
         this.actState = this.lobby;
-        this.lobby.enter(props);
+        this.lobby.enter({ actPlayers: props.numPlayers });
         break;
       case ClientState.Game:
         const g = this.game;
         g.on(GSig.Add, (c: cardID, t: tileID) => {
-          this.socket.emit("placeCard", g.model.roomId, t, c);
+          this.socket.emit("placeCard", t, c);
         });
         g.on(GSig.Submit, () => {
-          this.socket.emit("submitTurn", g.model.roomId);
+          this.socket.emit("submitTurn");
         });
         this.actState = this.game;
         break;
@@ -95,14 +98,18 @@ export class StateManager {
   }
 
   registerHandlers(socket: Socket<ServerEvents, ClientEvents>) {
-    socket.on("joinGameAck", (numPlayers) =>
-      this.changeState(ClientState.Lobby, { actPlayers: numPlayers })
-    );
+    socket.on("joinGameAck", (numPlayers: number) => {
+      if (this.actState === this.lobby) {
+        this.lobby.setPlayers(numPlayers);
+      } else {
+        this.changeState(ClientState.Lobby, { numPlayers });
+      }
+    });
 
-    socket.on("roundStart", (roomId, playerDTOs, selfDTO, riverCards, gameStart) => {
+    socket.on("roundStart", (playerDTOs, selfDTO, riverCards, gameStart) => {
       this.changeState(ClientState.Game);
       if (gameStart) {
-        this.game.initializeGame(roomId, playerDTOs, selfDTO, riverCards);
+        this.game.initializeGame(playerDTOs, selfDTO, riverCards);
       }
     });
 
@@ -111,7 +118,7 @@ export class StateManager {
     });
 
     socket.on("waitTurn", (playerIndex, duration) =>
-      this.game.updateMyTurn(false, playerIndex, duration)
+      this.game.updateMyTurn(false, playerIndex, duration),
     );
   }
 }

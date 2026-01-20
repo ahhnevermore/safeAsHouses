@@ -44,7 +44,7 @@ export class Tile {
 
   placeUnit(
     unit: Unit,
-    playerID: ID
+    playerID: ID,
   ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: unitID] {
     var territoryCaptured = false;
     var success = false;

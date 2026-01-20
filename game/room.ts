@@ -32,6 +32,7 @@ export class Room extends EventEmitter {
   actIndex: number = 0;
   turnTimer: NodeJS.Timeout | null = null;
   turnDuration: number = 30000;
+  public gameStarted: boolean = false;
 
   io: IOServer<ClientEvents, ServerEvents>;
   logger: Logger;
@@ -39,7 +40,7 @@ export class Room extends EventEmitter {
   constructor(
     ioServer: IOServer<ClientEvents, ServerEvents>,
     logger: Logger,
-    initialize: boolean = true
+    initialize: boolean = true,
   ) {
     super();
     this.io = ioServer;
@@ -48,7 +49,7 @@ export class Room extends EventEmitter {
     if (initialize) {
       this.deck = new Deck();
       this.board = new Board();
-      this.id = "room-" + Room.nextID++ as roomID;
+      this.id = ("room-" + Room.nextID++) as roomID;
       this.logger = this.logger.child({ roomID: this.id });
     } else {
       // If we're not initializing, these will be set by the deserializer
@@ -58,14 +59,76 @@ export class Room extends EventEmitter {
     }
   }
 
-  addPlayer(socket: IOSocket<ClientEvents, ServerEvents>, name: string) {
-    var player = new Player(socket.id as ID, name, this.players.length.toString() as publicID);
+  static deserialize(
+    json: string,
+    ioServer: IOServer<ClientEvents, ServerEvents>,
+    logger: Logger,
+  ): Room {
+    const data = JSON.parse(json);
+    const room = new Room(ioServer, logger, false);
+
+    room.id = data.id;
+    room.pot = data.pot;
+    room.actIndex = data.actIndex;
+    room.gameStarted = data.gameStarted || false; // Default to false if missing
+
+    room.deck = Deck.fromJSON(data.deck);
+    room.board = Board.fromJSON(data.board);
+    room.players = data.players.map((p: any) => Player.fromJSON(p));
+
+    return room;
+  }
+
+  addPlayer(userId: ID, name: string): number {
+    var player = new Player(userId, name, this.players.length.toString() as publicID);
     this.players.push(player);
     this.board.territory[player.id] = new Set<tileID>();
 
-    socket.join(this.id);
-    this.logger.info("A user connected:", socket.id);
-    this.sendRoom("joinGameAck", this.players.length);
+    return this.players.length;
+  }
+
+  getPlayerByUserId(userId: ID): Player | undefined {
+    return this.players.find((pl) => pl.id === userId);
+  }
+
+  sendReconnectionState(userId: ID) {
+    const player = this.getPlayerByUserId(userId);
+    if (!player) return;
+
+    const playerDTOs = this.players.map((pl) => pl.toPlayerDTO());
+    const riverCards: cardID[] = [];
+
+    // Gather all current river cards
+    RIVERS.forEach((r) => {
+      const tileVec = Vec2.fromKey(r);
+      const tile = this.board.getTile(tileVec.x, tileVec.y);
+      if (tile && tile.structure && isRiver(tile.structure)) {
+        const card = (tile.structure as River).card;
+        if (card) {
+          riverCards.push(card.toKey());
+        }
+      }
+    });
+
+    // Send the current game state to the reconnecting player
+    this.sendPlayer(
+      userId,
+      "roundStart",
+      playerDTOs,
+      player.toSelfDTO(),
+      riverCards,
+      false, // Not a fresh game start, just a reconnection
+    );
+
+    // If it's this player's turn, send them the turn notification
+    if (this.isPlayerTurn(userId)) {
+      this.sendPlayer(userId, "yourTurn", player.publicID, this.turnDuration);
+    } else {
+      const actPlayer = this.getCurrPlayer();
+      if (actPlayer) {
+        this.sendPlayer(userId, "waitTurn", actPlayer.publicID, this.turnDuration);
+      }
+    }
   }
 
   isRoomFull() {
@@ -73,6 +136,7 @@ export class Room extends EventEmitter {
   }
 
   startGame() {
+    this.gameStarted = true;
     this.startRound();
   }
   startRound() {
@@ -97,15 +161,7 @@ export class Room extends EventEmitter {
     });
     const playerDTOs = this.players.map((pl) => pl.toPlayerDTO());
     this.players.forEach((pl) => {
-      this.sendPlayer(
-        pl.id,
-        "roundStart",
-        this.id,
-        playerDTOs,
-        pl.toSelfDTO(),
-        riverCards,
-        true
-      );
+      this.sendPlayer(pl.id, "roundStart", playerDTOs, pl.toSelfDTO(), riverCards, true);
     });
     this.startTurnTimer();
   }
@@ -174,7 +230,10 @@ export class Room extends EventEmitter {
   ) {
     // This is cluster-safe. It tells the redis-adapter to send the message
     // to everyone in the room `this.id` EXCEPT for the socket with `playerID`.
-    this.io.to(this.id).except(playerID).emit(signal, ...args);
+    this.io
+      .to(this.id)
+      .except(playerID)
+      .emit(signal, ...args);
   }
 
   isPlayerTurn(playerID: string): boolean {

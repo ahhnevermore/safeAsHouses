@@ -42,6 +42,13 @@ export class Player {
     };
   }
 
+  static fromJSON(data: any): Player {
+    const player = new Player(data.id, data.name, data.publicID);
+    player.coins = data.coins;
+    player.hand = data.hand.map((key: string) => Card.fromKey(key as any));
+    return player;
+  }
+
   toPlayerDTO(): playerDTO {
     return {
       id: this.publicID,

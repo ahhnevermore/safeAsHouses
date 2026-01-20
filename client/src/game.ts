@@ -99,7 +99,6 @@ export class GameState extends PIXI.EventEmitter implements IState {
   handDisplayContainer: PIXI.Container;
 
   model: {
-    roomId: roomID;
     myTurn: boolean;
     timeLeft: number;
     actPlayerID: publicID;
@@ -109,7 +108,6 @@ export class GameState extends PIXI.EventEmitter implements IState {
     actAction: ActiveAction;
     votedEnd: boolean;
   } = {
-    roomId: "" as roomID, 
     myTurn: false,
     timeLeft: 0,
     actPlayerID: "" as publicID,
@@ -213,7 +211,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
         tile.on("clicked", (t: BoardTile) => this.onTileClicked(t));
 
         return tile;
-      })
+      }),
     );
 
     this.buttons.submit = new UIButton({
@@ -307,7 +305,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       this.buttons.allIn?.setEnabled(!onePlayerCards && !noCards);
 
       this.buttons.add?.setEnabled(
-        this.isValidPlacement(this.mainUI.selTile.xIndex, this.mainUI.selTile.yIndex, playerID)
+        this.isValidPlacement(this.mainUI.selTile.xIndex, this.mainUI.selTile.yIndex, playerID),
       );
     }
 
@@ -395,7 +393,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
     if (this.mainUI.playerHighlight) {
       this.mainUI.playerHighlight.position.set(
         BOARD_WIDTH + col * tdp_BoxWidth,
-        tdp_MarginY + row * tdp_BoxHeight
+        tdp_MarginY + row * tdp_BoxHeight,
       );
       this.mainUI.playerHighlight.tint = this.model.players[actIndex].colour ?? HUD_HIGHLIGHT;
     }
@@ -403,13 +401,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
     this.updateButtonState();
   }
 
-  initializeGame(
-    roomId: roomID,
-    playerDTOs: playerDTO[],
-    selfDTO: selfDTO,
-    riverCards: cardID[]
-  ) {
-    this.model.roomId = roomId;
+  initializeGame(playerDTOs: playerDTO[], selfDTO: selfDTO, riverCards: cardID[]) {
     this.model.players = playerDTOs;
     this.model.self = selfDTO;
     this.setupTileDisplay();
@@ -537,7 +529,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       this.tileUI.structIcon,
       this.tileUI.structCard,
       this.tileUI.structText1,
-      this.tileUI.structText2
+      this.tileUI.structText2,
     );
   }
 
