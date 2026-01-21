@@ -306,6 +306,47 @@ async function startWorker() {
     server.listen(PORT, () => {
       logger.info(`Worker ${process.pid} is running on http://localhost:${PORT}`);
     });
+
+    // Graceful shutdown logic for the worker
+    const handleWorkerShutdown = async () => {
+      logger.info(`Worker ${process.pid} starting graceful shutdown...`);
+
+      // 1. Stop the server from accepting new connections and disconnect existing clients.
+      io.close(() => {
+        logger.info(`Socket.IO server closed in worker ${process.pid}.`);
+      });
+
+      // 2. Close the HTTP server.
+      server.close(async () => {
+        logger.info(`HTTP server closed in worker ${process.pid}.`);
+        // 3. Disconnect from Redis.
+        try {
+          await redisClient.quit();
+          logger.info(`Worker ${process.pid} disconnected from Redis.`);
+        } catch (err) {
+          logger.error(`Error quitting Redis in worker ${process.pid}:`, err);
+        }
+        // 4. Exit the process.
+        process.exit(0);
+      });
+
+      // Failsafe timeout to force exit if shutdown hangs.
+      setTimeout(() => {
+        logger.warn(`Graceful shutdown timeout reached in worker ${process.pid}. Forcing exit.`);
+        process.exit(1);
+      }, 30000); // 30-second timeout
+    };
+
+    // Listen for shutdown messages from the primary process (in cluster mode)
+    process.on("message", (msg) => {
+      if (msg === "shutdown") {
+        logger.info(`Worker ${process.pid} received shutdown message from primary.`);
+        handleWorkerShutdown();
+      }
+    });
+
+    // Also handle direct signals for single-process mode
+    process.on("SIGINT", handleWorkerShutdown);
   } catch (err) {
     logger.error(`Worker ${process.pid} failed to start.`, err);
     process.exit(1);
@@ -329,6 +370,21 @@ if (useCluster && cluster.isPrimary) {
     );
     cluster.fork();
   });
+
+  const gracefulShutdown = (signal: string) => {
+    logger.info(`Received ${signal}, signaling workers to shut down.`);
+    for (const id in cluster.workers) {
+      cluster.workers[id]?.send("shutdown");
+    }
+    // Allow workers time to shut down before the primary process exits.
+    setTimeout(() => {
+      logger.info("Primary process exiting.");
+      process.exit(0);
+    }, 5000); // 5 seconds grace period
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 } else {
   // Worker (or single-process) runs the server
   startWorker();

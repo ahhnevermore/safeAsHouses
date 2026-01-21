@@ -108,9 +108,7 @@ export class StateManager {
 
     socket.on("roundStart", (playerDTOs, selfDTO, riverCards, gameStart) => {
       this.changeState(ClientState.Game);
-      if (gameStart) {
-        this.game.initializeGame(playerDTOs, selfDTO, riverCards);
-      }
+      this.game.initializeGame(playerDTOs, selfDTO, riverCards);
     });
 
     socket.on("yourTurn", (publicID, duration) => {
@@ -120,5 +118,21 @@ export class StateManager {
     socket.on("waitTurn", (playerIndex, duration) =>
       this.game.updateMyTurn(false, playerIndex, duration),
     );
+
+    socket.on("disconnect", (reason) => {
+      // Regardless of the reason, if we're not on the main menu, we should return there.
+      if (this.actState !== this.mainMenu) {
+        this.changeState(ClientState.MainMenu);
+      }
+
+      // Now, display the appropriate notification on the main menu.
+      if (reason === "io server disconnect") {
+        // This is a graceful shutdown initiated by the server (e.g., for an update).
+        this.mainMenu.setNotification("Server is updating, please try again shortly.");
+      } else {
+        // This could be a network issue or an unexpected server crash.
+        this.mainMenu.setNotification("Connection lost. Please check your network.");
+      }
+    });
   }
 }

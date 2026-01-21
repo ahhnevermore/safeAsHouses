@@ -7,6 +7,7 @@ export enum MMSig {
 }
 export class MainMenuState extends PIXI.EventEmitter implements IState {
   container = new PIXI.Container();
+  private notificationText: PIXI.Text;
 
   constructor() {
     super();
@@ -15,6 +16,15 @@ export class MainMenuState extends PIXI.EventEmitter implements IState {
       style: { fill: 0xffffff, fontSize: 24, fontFamily: "Courier" },
     });
     introText.y = -50;
+
+    this.notificationText = new PIXI.Text({
+      text: "",
+      style: { fill: 0xffa500, fontSize: 18, fontFamily: "Courier" }, // Orange color for notifications
+    });
+    this.notificationText.y = 80;
+    this.notificationText.x = 100;
+    this.notificationText.anchor.set(0.5, 0);
+
     const button = new PIXI.Graphics().roundRect(0, 0, 200, 60, 15).fill({ color: 0x333333 });
     const text = new PIXI.Text({
       text: "Join Room",
@@ -29,11 +39,21 @@ export class MainMenuState extends PIXI.EventEmitter implements IState {
       this.emit(MMSig.Join);
     });
 
-    this.container.addChild(button, text, introText);
+    this.container.addChild(button, text, introText, this.notificationText);
     this.container.x = (1280 - 200) / 2; // adjust later for center
     this.container.y = (720 - 60) / 2;
   }
 
-  enter(props?: Record<string, unknown>) {}
+  public setNotification(message: string) {
+    this.notificationText.text = message;
+    // Clear the message after a few seconds
+    setTimeout(() => {
+      this.notificationText.text = "";
+    }, 5000);
+  }
+
+  enter(props?: Record<string, unknown>) {
+    this.notificationText.text = ""; // Clear notification on re-entering the state
+  }
   exit() {}
 }
