@@ -21,6 +21,7 @@ import { Logger } from "winston";
 import { Unit } from "./unit.js";
 import { cardID, coins, ID, publicID, roomID, tileID, unitID } from "./types.js";
 import { playerDTO } from "./dto.js";
+import { TimerManager } from "../server/timer.js";
 
 export class Room extends EventEmitter {
   private static nextID = 1;
@@ -30,21 +31,24 @@ export class Room extends EventEmitter {
   id: roomID;
   players: Player[] = [];
   actIndex: number = 0;
-  turnTimer: NodeJS.Timeout | null = null;
   turnDuration: number = 30000;
-  public gameStarted: boolean = false;
+  // round is in natural numbers only-0 is invalid
+  round: number = 0;
 
   io: IOServer<ClientEvents, ServerEvents>;
   logger: Logger;
+  timerManager: TimerManager;
 
   constructor(
     ioServer: IOServer<ClientEvents, ServerEvents>,
     logger: Logger,
+    timerManager: TimerManager,
     initialize: boolean = true,
   ) {
     super();
     this.io = ioServer;
     this.logger = logger;
+    this.timerManager = timerManager;
 
     if (initialize) {
       this.deck = new Deck();
@@ -57,26 +61,6 @@ export class Room extends EventEmitter {
       this.board = null as any;
       this.id = "" as roomID;
     }
-  }
-
-  static deserialize(
-    json: string,
-    ioServer: IOServer<ClientEvents, ServerEvents>,
-    logger: Logger,
-  ): Room {
-    const data = JSON.parse(json);
-    const room = new Room(ioServer, logger, false);
-
-    room.id = data.id;
-    room.pot = data.pot;
-    room.actIndex = data.actIndex;
-    room.gameStarted = data.gameStarted || false; // Default to false if missing
-
-    room.deck = Deck.fromJSON(data.deck);
-    room.board = Board.fromJSON(data.board);
-    room.players = data.players.map((p: any) => Player.fromJSON(p));
-
-    return room;
   }
 
   addPlayer(userId: ID, name: string): number {
@@ -120,7 +104,6 @@ export class Room extends EventEmitter {
       false, // Not a fresh game start, just a reconnection
     );
 
-    // If it's this player's turn, send them the turn notification
     if (this.isPlayerTurn(userId)) {
       this.sendPlayer(userId, "yourTurn", player.publicID, this.turnDuration);
     } else {
@@ -136,10 +119,10 @@ export class Room extends EventEmitter {
   }
 
   startGame() {
-    this.gameStarted = true;
-    this.startRound();
+    this.startRound(1);
   }
-  startRound() {
+  async startRound(num:number) {
+    this.round = num;
     this.players.forEach((pl, idx) => {
       pl.takeCards(this.deck.deal(REG_HAND_SIZE - pl.hand.length));
       this.board.capture(pl.id, this.board.bases[idx]);
@@ -163,43 +146,38 @@ export class Room extends EventEmitter {
     this.players.forEach((pl) => {
       this.sendPlayer(pl.id, "roundStart", playerDTOs, pl.toSelfDTO(), riverCards, true);
     });
-    this.startTurnTimer();
-  }
 
-  startTurnTimer() {
-    try {
-      const actPlayer = this.players[this.actIndex];
-
-      this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, this.turnDuration);
-      this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, this.turnDuration);
-
-      // Clear any previous timer
-      if (this.turnTimer) clearTimeout(this.turnTimer);
-      this.turnTimer = null;
-
-      // Start countdown for this turn
-      this.turnTimer = setTimeout(() => {
-        this.advanceTurn();
-      }, this.turnDuration);
-    } catch (err) {
-      this.windup("startTurnTimer", err as Error);
+    if (this.round === 1) {
+      await this.timerManager.initializeGameTimers(this.id);
+    } else {
+      await this.timerManager.startTurnTimers(this.id);
     }
+
+    const actPlayer = this.players[this.actIndex];
+    this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, this.turnDuration);
+    this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, this.turnDuration);
   }
 
-  advanceTurn() {
+  advanceTurn(): boolean {
     this.actIndex = (this.actIndex + 1) % this.players.length;
     const winner = this.board.checkRiverWin();
     if (winner) {
       const winningPlayer = this.players.find((pl) => pl.id == winner);
       if (winningPlayer) {
         this.sendRoom("winner", winningPlayer.publicID);
+        return true;
       }
     }
     const income = this.board.calculateIncome(this.players.map((pl) => pl.id));
     for (const [playerID, count] of Object.entries(income)) {
       this.sendPlayer(playerID as ID, "income", (count * TILE_COINS) as coins);
     }
-    this.startTurnTimer();
+
+    // Send UI notifications for the new active player
+    const actPlayer = this.players[this.actIndex];
+    this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, this.turnDuration);
+    this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, this.turnDuration);
+    return false; // Game is not over
   }
 
   windup(reason: string, err?: Error) {
@@ -242,6 +220,10 @@ export class Room extends EventEmitter {
 
   getCurrPlayer(): Player | undefined {
     return this.players[this.actIndex];
+  }
+
+  hasGameStarted(): boolean {
+    return this.round > 0;
   }
 
   /*

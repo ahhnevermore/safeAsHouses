@@ -1,9 +1,53 @@
+# Safe As Houses
+
+## Getting Started
+
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+
+### Prerequisites
+
+- Node.js (v18 or later recommended)
+- Redis
+
+**Note on Redis Configuration:** The application automatically configures Redis keyspace notifications on startup (required for the distributed turn timer system). No manual configuration is needed for development. However, for production deployments where Redis may restart, it's recommended to add the following to your `redis.conf` file to ensure the setting persists:
+
+```
+notify-keyspace-events Ex
+```
+
+### Installation
+
+1. Clone the repo:
+   ```bash
+   git clone <repo-url>
+   ```
+2. Install NPM packages:
+   ```bash
+   npm install
+   ```
+
+### Running the Application
+
+To run the server for development:
+
+```bash
+npm run dev
+```
+
+To build and run the server for production (cluster mode):
+
+```bash
+npm run cluster
+```
+
+---
+
 The official repo for the original game Safe As Houses
 
 Safe As Houses is a digital card/board game where you fight to conquer the board by wagering on card showdowns
 Controlling territory gives you more income to wager more
 
-You can win by : 
+You can win by :
 
 1. Controlling the river for a set number of turns
 2. Building a solitaire unit

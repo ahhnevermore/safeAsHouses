@@ -8,21 +8,21 @@ import { createClient } from "redis";
 import { createAdapter } from "@socket.io/redis-adapter";
 import cluster from "cluster";
 import os from "os";
-import { saveRoomState, loadRoom } from "./roomStateManager.js";
+import { saveRoomState, loadRoom, serializeRoomState } from "./roomStateManager.js";
 import { roomID, ID } from "../game/types.js";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 import session from "express-session";
 import { RedisStore } from "connect-redis";
 import cookieParser from "cookie-parser";
-import {
-  CLEANUP_USER_LUA,
-  GET_ROOM_BY_USER_ID_LUA,
-  MATCH_USER_LUA,
-  USER_SOCKETS_PREFIX,
-  USER_TO_ROOM_PREFIX,
-  WAITING_ROOMS_ZSET,
-} from "./lua-scripts.js";
+import { MATCH_USER_LUA, USER_TO_ROOM_PREFIX, WAITING_ROOMS_ZSET } from "./lua-scripts.js";
 import cors from "cors";
+import {
+  TimerManager,
+  TURN_MAIN_PREFIX,
+  TURN_ACTION_PREFIX,
+  GAME_ABANDON_PREFIX,
+} from "./timer.js";
+import { deserializeRoomState } from "./roomStateManager.js";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "your-super-secret-session-key"; //TODO
 const COOKIE_NAME = "s4feashouses.sid";
@@ -39,6 +39,31 @@ declare module "express-session" {
     userId: ID;
   }
 }
+
+const cleanupGame = async (
+  redisClient: ReturnType<typeof createClient>,
+  roomId: roomID,
+  room: Room | null,
+) => {
+  const timerKeys = [
+    `${TURN_MAIN_PREFIX}${roomId}`,
+    `${TURN_ACTION_PREFIX}${roomId}`,
+    `${GAME_ABANDON_PREFIX}${roomId}`,
+  ];
+
+  if (!room) {
+    // If we don't have the room object, we can't get the players to clean up their mappings.
+    // Just delete the main room key and timers.
+    logger.warn(`Cleaning up room ${roomId} without full player data.`);
+    await redisClient.del([roomId, ...timerKeys]);
+    return;
+  }
+  logger.info(`Cleaning up game state for room ${roomId}...`);
+  const playerKeys = room.players.map((p) => `${USER_TO_ROOM_PREFIX}${p.id}`);
+  // Delete the main room state, all user->room mappings, and all timers in one go.
+  await redisClient.del([roomId, ...playerKeys, ...timerKeys]);
+  logger.info(`Cleanup complete for room ${roomId}.`);
+};
 
 const app = express();
 app.set("trust proxy", 1);
@@ -106,6 +131,10 @@ async function startWorker() {
     redisClient.on("error", (err) => logger.error("Redis Client Error", err));
     await redisClient.connect();
 
+    // Load Lua scripts and cache their SHAs for performance.
+    const matchUserSha = await redisClient.scriptLoad(MATCH_USER_LUA);
+    logger.info(`Cached MATCH_USER_LUA script with SHA: ${matchUserSha}`);
+
     const pubClient = redisClient.duplicate();
     const subClient = redisClient.duplicate();
 
@@ -113,12 +142,22 @@ async function startWorker() {
     io.adapter(createAdapter(pubClient, subClient));
     logger.info(`Worker ${process.pid} connected to Redis and using adapter`);
 
+    const redisUrl = `redis://${process.env.REDIS_HOST || "localhost"}:${
+      process.env.REDIS_PORT || 6379
+    }`;
+    // A worker process is a pure Executor.
+    const timerManager = new TimerManager(redisUrl, logger, {
+      isExecutor: true,
+      isListener: false,
+    });
+    await timerManager.initialize();
+
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
     // Give other workers a bit more time to create and persist the Room state
     // before we give up. This helps avoid race conditions during matchmaking.
     const waitAndLoadRoom = async (roomId: roomID, attempts = 20, delay = 100) => {
       for (let i = 0; i < attempts; i++) {
-        const r = await loadRoom(redisClient as any, roomId, io, logger);
+        const r = await loadRoom(redisClient as any, roomId, io, logger, timerManager);
         if (r) return r;
         await sleep(delay);
       }
@@ -156,28 +195,19 @@ async function startWorker() {
       // Join a room based on the user ID to allow for direct messaging.
       socket.join(userId);
 
-      redisClient.sAdd(`userSockets:${userId}`, socket.id);
-
       socket.on("disconnect", async () => {
-        if (userId) {
-          // Redis cleanup
-          await redisClient.eval(CLEANUP_USER_LUA, {
-            keys: [`userSockets:${userId}`],
-            arguments: [socket.id],
-          });
-
-          logger.info(`User ${userId} disconnected on socket ${socket.id} `);
-        }
+        logger.info(`User ${userId} disconnected on socket ${socket.id}.`);
       });
 
       socket.on("joinGame", async (username: string) => {
         try {
           const userId = socket.data.userId;
           const MAX_PLAYERS = 4;
+          const newRoomId = `room:${uuidv7()}`;
 
-          const res = await redisClient.eval(MATCH_USER_LUA, {
+          const res = await redisClient.evalSha(matchUserSha, {
             keys: [WAITING_ROOMS_ZSET],
-            arguments: [MAX_PLAYERS.toString(), userId, USER_TO_ROOM_PREFIX, USER_SOCKETS_PREFIX],
+            arguments: [MAX_PLAYERS.toString(), userId, USER_TO_ROOM_PREFIX, newRoomId],
           });
 
           if (!res || !Array.isArray(res)) {
@@ -188,8 +218,13 @@ async function startWorker() {
           const [matchType, roomId, ...rest] = res as [string, roomID, ...any[]];
 
           if (matchType === "RECONNECT") {
-            const socketIds = rest[0] as string[];
-            const existingRoom = await loadRoom(redisClient as any, roomId, io, logger);
+            const existingRoom = await loadRoom(
+              redisClient as any,
+              roomId,
+              io,
+              logger,
+              timerManager,
+            );
             if (existingRoom) {
               // The socket needs to join the room before receiving events.
               socket.join(roomId);
@@ -197,7 +232,7 @@ async function startWorker() {
               logger.info(`User ${userId} reconnected to existing room ${existingRoom.id}`);
               // @ts-ignore - Touch the session to reset the expiration timer
               socket.request.session.touch();
-              if (existingRoom.gameStarted) {
+              if (existingRoom.hasGameStarted()) {
                 existingRoom.sendReconnectionState(userId);
               } else {
                 existingRoom.sendRoom("joinGameAck", existingRoom.players.length);
@@ -213,7 +248,6 @@ async function startWorker() {
 
           if (matchType === "MATCH") {
             const newPlayerCountStr = rest[0] as string;
-            const socketIds = rest[1] as string[];
             const newPlayerCount = parseInt(newPlayerCountStr, 10);
             let room: Room | null;
             logger.info(
@@ -221,7 +255,7 @@ async function startWorker() {
             );
 
             if (newPlayerCount === 1) {
-              room = new Room(io, logger);
+              room = new Room(io, logger, timerManager);
               room.id = roomId;
               logger.info(`Created Room instance for ${roomId} on worker ${process.pid}`);
             } else {
@@ -268,20 +302,21 @@ async function startWorker() {
       const withRoom = (handler: (room: Room, ...args: any[]) => Promise<void>) => {
         return async (...args: any[]) => {
           const userId = socket.data.userId;
-
           try {
-            const res = await redisClient.eval(GET_ROOM_BY_USER_ID_LUA, {
-              arguments: [userId, USER_TO_ROOM_PREFIX],
-            });
-
-            if (res && Array.isArray(res)) {
-              const [roomId, roomData] = res as [roomID, string];
-              // We have the raw room data, so we can deserialize it directly instead of calling loadRoom.
-              const room = Room.deserialize(roomData, io, logger);
+            const userToRoomKey = `${USER_TO_ROOM_PREFIX}${userId}`;
+            const roomId = (await redisClient.get(userToRoomKey)) as roomID | null;
+            if (roomId) {
+              const roomData = await redisClient.get(roomId);
+              if (!roomData) {
+                await redisClient.del(userToRoomKey);
+                logger.warn(
+                  `User ${userId} had a stale room mapping for non-existent room ${roomId}. Deleted mapping.`,
+                );
+                return;
+              }
+              const room = deserializeRoomState(roomData, io, logger, timerManager);
               room.id = roomId;
-
               await handler(room, ...args);
-              await saveRoomState(redisClient as any, room);
             } else {
               logger.warn(`User ${userId} tried to perform an action but is not in a valid room.`);
             }
@@ -294,9 +329,14 @@ async function startWorker() {
       socket.on(
         "submitTurn",
         withRoom(async (room) => {
-          // The handler now correctly receives the room object.
           if (room.isPlayerTurn(socket.data.userId)) {
-            room.advanceTurn();
+            const isGameOver = room.advanceTurn();
+            if (isGameOver) {
+              await cleanupGame(redisClient as any, room.id, room);
+            } else {
+              const serializedState = serializeRoomState(room);
+              await timerManager.advanceTurnTimersAndSaveState(room.id, serializedState);
+            }
           }
         }),
       );
@@ -358,7 +398,58 @@ const useCluster = process.env.CLUSTER === "true";
 
 if (useCluster && cluster.isPrimary) {
   const workerCount = Number(process.env.WORKERS) || os.cpus().length;
-  logger.info(`Primary ${process.pid} starting ${workerCount} workers (CLUSTER=true)`);
+  logger.info(`Primary ${process.pid} is running, forking ${workerCount} workers...`);
+
+  const redisUrl = `redis://${process.env.REDIS_HOST || "localhost"}:${
+    process.env.REDIS_PORT || 6379
+  }`;
+  // The primary process is both an Executor and a Listener.
+  const timerManager = new TimerManager(redisUrl, logger, {
+    isExecutor: true,
+    isListener: true,
+  });
+  const redisClient = redisClientForStore.duplicate();
+
+  // The primary process needs its own Socket.IO server instance with a Redis adapter
+  // to be able to broadcast messages across the cluster.
+  const primaryIo = new Server<ClientEvents, ServerEvents>();
+  const pubClient = redisClient.duplicate();
+  const subClient = redisClient.duplicate();
+
+  (async () => {
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    primaryIo.adapter(createAdapter(pubClient, subClient));
+
+    await timerManager.initialize();
+    await redisClient.connect();
+
+    // The primary handles all timer expiration events.
+    timerManager.on("turnTimerExpired", async (roomId: roomID) => {
+      try {
+        const room = await loadRoom(redisClient as any, roomId, primaryIo, logger, timerManager);
+        if (room) {
+          logger.info(`PRIMARY: Turn timer expired for room ${roomId}. Advancing turn.`);
+          const isGameOver = room.advanceTurn();
+          if (isGameOver) {
+            await cleanupGame(redisClient as any, roomId, room);
+          } else {
+            const serializedState = serializeRoomState(room);
+            await timerManager.advanceTurnTimersAndSaveState(room.id, serializedState);
+          }
+        } else {
+          logger.warn(`PRIMARY: Timer expired for non-existent room ${roomId}.`);
+        }
+      } catch (err) {
+        logger.error(`PRIMARY: Error processing turn timer expiration for room ${roomId}:`, err);
+      }
+    });
+
+    timerManager.on("gameAbandonTimerExpired", async (roomId: roomID) => {
+      logger.warn(`PRIMARY: Game ${roomId} abandoned due to inactivity. Cleaning up.`);
+      const room = await loadRoom(redisClient as any, roomId, primaryIo, logger, timerManager);
+      await cleanupGame(redisClient as any, roomId, room);
+    });
+  })();
 
   for (let i = 0; i < workerCount; i++) {
     cluster.fork();
@@ -371,11 +462,13 @@ if (useCluster && cluster.isPrimary) {
     cluster.fork();
   });
 
-  const gracefulShutdown = (signal: string) => {
+  const gracefulShutdown = async (signal: string) => {
     logger.info(`Received ${signal}, signaling workers to shut down.`);
     for (const id in cluster.workers) {
       cluster.workers[id]?.send("shutdown");
     }
+    await timerManager.close();
+    await redisClient.quit();
     // Allow workers time to shut down before the primary process exits.
     setTimeout(() => {
       logger.info("Primary process exiting.");

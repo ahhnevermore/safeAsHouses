@@ -4,20 +4,16 @@
   "type": "module",
   "description": "A browser-based board game with cards, backend in Node.js, communication via Socket.IO.",
   "scripts": {
-    "predev":"npm run build",
-    "dev": "DEBUG=socket.io:*,socket.io-parser NODE_ENV=development node dist/server/gameserver.js",
-
-    "start": "npm run build && NODE_ENV=production node dist/server/gameserver.js",
 
     "build:client": "vite build",
     "build:server": "tsc",
     "build": "npm run build:client && npm run build:server",
 
-    "precluster": "npm run build",
-    "cluster": "NODE_ENV=production CLUSTER=true node dist/server/gameserver.js",
+    "prestart": "npm run build",
+    "start": "NODE_ENV=production CLUSTER=true node dist/server/gameserver.js",
 
-    "predevcluster":"npm run build",
-    "devcluster": "DEBUG=socket.io:*,socket.io-parser NODE_ENV=development CLUSTER=true node dist/server/gameserver.js"
+    "predev":"npm run build",
+    "dev": "DEBUG=socket.io:*,socket.io-parser NODE_ENV=development CLUSTER=true node dist/server/gameserver.js"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
