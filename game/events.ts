@@ -15,7 +15,7 @@ export type ServerEvents = {
   yourTurn: (publicID: publicID, duration: number) => void;
   waitTurn: (publicID: publicID, duration: number) => void;
   winner: (publicID: publicID) => void;
-  income: (amount: coins) => void;
+  income: (netWorths: Record<publicID, coins>) => void;
   placeCardAck: (tileID: tileID, cardID: cardID, unitID: unitID, swallowed: boolean) => void;
   placeCardPublic: (
     publicID: publicID,

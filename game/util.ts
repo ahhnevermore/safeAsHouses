@@ -4,8 +4,8 @@ export const BOARD_SIZE: number = 9;
 export const REG_MOVE: number = 1;
 export const ACE_MOVE: number = 2;
 export const KING_RADIUS: number = 2;
-export const TILE_COINS: coins = 0.1 as coins;
-export const CARD_PRICE: number = 1;
+export const TILE_COINS: coins = 100 as coins;
+export const CARD_PRICE: coins = 1000 as coins;
 export const PLAYER_COUNT: number = 4;
 export const RIVERS: tileID[] = ["4,4" as tileID];
 export const BASES: tileID[] = ["0,0", "8,0", "0,8", "8,8"] as tileID[];
@@ -155,3 +155,8 @@ export function isRiver(s: Structure | undefined | null): s is River {
 export function isBase(s: Structure | undefined | null): s is Base {
   return !!s && s.type === BASE_TYPE;
 }
+
+
+export const TURN_TIMER_MAIN_SECONDS = 300; // 5 minutes
+export const TURN_TIMER_ACTION_SECONDS = 30; // 30 seconds
+export const GAME_ABANDON_TIMER_SECONDS = 7200; // 2 hours

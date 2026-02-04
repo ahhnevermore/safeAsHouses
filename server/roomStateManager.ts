@@ -14,7 +14,6 @@ interface SerializedRoom {
   id: string;
   pot: number;
   actIndex: number;
-  turnDuration: number;
   round: number;
   players: ReturnType<Player["toJSON"]>[];
   deck: ReturnType<Deck["toJSON"]>;
@@ -26,7 +25,6 @@ export function serializeRoomState(room: Room): string {
     id: room.id,
     pot: room.pot,
     actIndex: room.actIndex,
-    turnDuration: room.turnDuration,
     round: room.round,
     players: room.players.map((p) => p.toJSON()),
     deck: room.deck.toJSON(),
@@ -50,7 +48,6 @@ export function deserializeRoomState(
   room.id = data.id as roomID;
   room.pot = data.pot;
   room.actIndex = data.actIndex;
-  room.turnDuration = data.turnDuration;
   room.round = data.round || 0;
   room.deck = Deck.fromJSON(data.deck);
   room.board = Board.fromJSON(data.board);

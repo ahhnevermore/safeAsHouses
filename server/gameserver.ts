@@ -335,7 +335,20 @@ async function startWorker() {
               await cleanupGame(redisClient as any, room.id, room);
             } else {
               const serializedState = serializeRoomState(room);
-              await timerManager.advanceTurnTimersAndSaveState(room.id, serializedState);
+              await timerManager.saveRoomBumpTurn(room.id, serializedState);
+            }
+          }
+        }),
+      );
+
+      socket.on(
+        "placeCard",
+        withRoom(async (room, tileID, cardID) => {
+          if (room.isPlayerTurn(socket.data.userId)) {
+            const cardPlacedSuccessfully = room.placeCard(socket.data.userId, cardID, tileID);
+            if (cardPlacedSuccessfully) {
+              const serializedState = serializeRoomState(room);
+              await timerManager.saveRoomBumpAction(room.id, serializedState);
             }
           }
         }),
@@ -434,7 +447,7 @@ if (useCluster && cluster.isPrimary) {
             await cleanupGame(redisClient as any, roomId, room);
           } else {
             const serializedState = serializeRoomState(room);
-            await timerManager.advanceTurnTimersAndSaveState(room.id, serializedState);
+            await timerManager.saveRoomBumpTurn(room.id, serializedState);
           }
         } else {
           logger.warn(`PRIMARY: Timer expired for non-existent room ${roomId}.`);

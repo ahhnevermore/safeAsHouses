@@ -1,12 +1,12 @@
 import { Card, CARD_PRICE } from "./util.js";
 import { playerDTO, selfDTO } from "./dto.js";
-import { ID, publicID } from "./types.js";
+import { coins, ID, publicID } from "./types.js";
 
 export class Player {
   id: ID;
   publicID: publicID;
   name: string;
-  coins: number = 10;
+  coins: coins = 10000 as coins;
   hand: Card[] = [];
   constructor(id: ID, name: string, pubID: publicID) {
     this.id = id;
@@ -16,7 +16,7 @@ export class Player {
 
   buyCard(card: Card): number {
     this.hand.push(card);
-    this.coins -= CARD_PRICE;
+    this.coins = (this.coins - CARD_PRICE) as coins;
     return CARD_PRICE;
   }
 

@@ -11,6 +11,7 @@ import {
   RIVERS,
   Scope,
   TILE_COINS,
+  TURN_TIMER_MAIN_SECONDS,
   Vec2,
 } from "./util.js";
 import { Deck } from "./deck.js";
@@ -23,6 +24,8 @@ import { cardID, coins, ID, publicID, roomID, tileID, unitID } from "./types.js"
 import { playerDTO } from "./dto.js";
 import { TimerManager } from "../server/timer.js";
 
+const turnDurationMs = TURN_TIMER_MAIN_SECONDS * 1000;
+
 export class Room extends EventEmitter {
   private static nextID = 1;
   pot: number = 0;
@@ -31,8 +34,6 @@ export class Room extends EventEmitter {
   id: roomID;
   players: Player[] = [];
   actIndex: number = 0;
-  turnDuration: number = 30000;
-  // round is in natural numbers only-0 is invalid
   round: number = 0;
 
   io: IOServer<ClientEvents, ServerEvents>;
@@ -64,6 +65,9 @@ export class Room extends EventEmitter {
   }
 
   addPlayer(userId: ID, name: string): number {
+    if (this.players.some((p) => p.id === userId)) {
+      return this.players.length; // Already added
+    }
     var player = new Player(userId, name, this.players.length.toString() as publicID);
     this.players.push(player);
     this.board.territory[player.id] = new Set<tileID>();
@@ -105,11 +109,11 @@ export class Room extends EventEmitter {
     );
 
     if (this.isPlayerTurn(userId)) {
-      this.sendPlayer(userId, "yourTurn", player.publicID, this.turnDuration);
+      this.sendPlayer(userId, "yourTurn", player.publicID, turnDurationMs);
     } else {
       const actPlayer = this.getCurrPlayer();
       if (actPlayer) {
-        this.sendPlayer(userId, "waitTurn", actPlayer.publicID, this.turnDuration);
+        this.sendPlayer(userId, "waitTurn", actPlayer.publicID, turnDurationMs);
       }
     }
   }
@@ -121,7 +125,7 @@ export class Room extends EventEmitter {
   startGame() {
     this.startRound(1);
   }
-  async startRound(num:number) {
+  async startRound(num: number) {
     this.round = num;
     this.players.forEach((pl, idx) => {
       pl.takeCards(this.deck.deal(REG_HAND_SIZE - pl.hand.length));
@@ -154,8 +158,8 @@ export class Room extends EventEmitter {
     }
 
     const actPlayer = this.players[this.actIndex];
-    this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, this.turnDuration);
-    this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, this.turnDuration);
+    this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, turnDurationMs);
+    this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, turnDurationMs);
   }
 
   advanceTurn(): boolean {
@@ -170,13 +174,24 @@ export class Room extends EventEmitter {
     }
     const income = this.board.calculateIncome(this.players.map((pl) => pl.id));
     for (const [playerID, count] of Object.entries(income)) {
-      this.sendPlayer(playerID as ID, "income", (count * TILE_COINS) as coins);
+      const player = this.getPlayerByUserId(playerID as ID);
+      const incomeAmount = (count * TILE_COINS) as coins;
+      if (player && incomeAmount > 0) {
+        player.coins = (player.coins + incomeAmount) as coins;
+      }
     }
+
+    // After all incomes are applied, create a single net worth object to broadcast.
+    const netWorths: Record<publicID, coins> = {};
+    this.players.forEach((p) => {
+      netWorths[p.publicID] = p.coins;
+    });
+    this.sendRoom("income", netWorths);
 
     // Send UI notifications for the new active player
     const actPlayer = this.players[this.actIndex];
-    this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, this.turnDuration);
-    this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, this.turnDuration);
+    this.sendPlayer(actPlayer.id, "yourTurn", actPlayer.publicID, turnDurationMs);
+    this.sendOtherPlayers(actPlayer.id, "waitTurn", actPlayer.publicID, turnDurationMs);
     return false; // Game is not over
   }
 
@@ -224,6 +239,40 @@ export class Room extends EventEmitter {
 
   hasGameStarted(): boolean {
     return this.round > 0;
+  }
+
+  placeCard(tileID: tileID, cardVal: cardID, id: ID): boolean {
+    const currPlayer = this.getCurrPlayer();
+    if (currPlayer && currPlayer.id == id && currPlayer.hasCard(cardVal)) {
+      const card = Card.fromKey(cardVal);
+      const unit = new Unit(card);
+      let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, id);
+      if (success) {
+        currPlayer.discard(cardVal);
+        this.deck.addDiscard(Card.fromKey(cardVal));
+        if (unitSwallowed) {
+          this.sendOtherPlayers(
+            id,
+            "placeCardPublic",
+            currPlayer.publicID,
+            tileID,
+
+            {
+              unitID: unitID,
+              cardID: cardVal,
+            },
+          );
+        } else {
+          this.sendOtherPlayers(id as ID, "placeCardPublic", currPlayer.publicID, tileID, {
+            unitID: unitID,
+          });
+        }
+        this.sendPlayer(id as ID, "placeCardAck", tileID, cardVal, unitID, unitSwallowed);
+        return true;
+      }
+    }
+    this.sendPlayer(id as ID, "placeCardRej", tileID, cardVal);
+    return false;
   }
 
   /*

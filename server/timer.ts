@@ -2,10 +2,8 @@ import { createClient, RedisClientType } from "redis";
 import { Logger } from "winston";
 import { roomID } from "../game/types.js";
 import { EventEmitter } from "events";
+import { GAME_ABANDON_TIMER_SECONDS, TURN_TIMER_ACTION_SECONDS, TURN_TIMER_MAIN_SECONDS } from "../game/util.js";
 
-const TURN_TIMER_MAIN_SECONDS = 300; // 5 minutes
-const TURN_TIMER_ACTION_SECONDS = 30; // 30 seconds
-const GAME_ABANDON_TIMER_SECONDS = 7200; // 2 hours
 
 export const TURN_MAIN_PREFIX = "turn-timer:main:";
 export const TURN_ACTION_PREFIX = "turn-timer:action:";
@@ -99,10 +97,7 @@ export class TimerManager extends EventEmitter {
     this.logger.debug(`Initialized all game start timers for room ${roomId}`);
   }
 
-  public async resetActionTimerAndSaveState(
-    roomId: roomID,
-    serializedRoomState: string,
-  ): Promise<void> {
+  public async saveRoomBumpAction(roomId: roomID, serializedRoomState: string): Promise<void> {
     const actionTimerKey = `${TURN_ACTION_PREFIX}${roomId}`;
 
     await this.redisClient
@@ -113,10 +108,7 @@ export class TimerManager extends EventEmitter {
     this.logger.debug(`Reset action timer and saved state for room ${roomId}`);
   }
 
-  public async advanceTurnTimersAndSaveState(
-    roomId: roomID,
-    serializedRoomState: string,
-  ): Promise<void> {
+  public async saveRoomBumpTurn(roomId: roomID, serializedRoomState: string): Promise<void> {
     const mainKey = `${TURN_MAIN_PREFIX}${roomId}`;
     const actionKey = `${TURN_ACTION_PREFIX}${roomId}`;
 

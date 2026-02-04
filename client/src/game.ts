@@ -16,6 +16,7 @@ import {
   TILE_CARD_LIMIT,
   TILE_COINS,
   TILE_UNIT_LIMIT,
+  TURN_TIMER_ACTION_SECONDS,
   Vec2,
 } from "../../game/util.js";
 import { playerDTO, selfDTO } from "../../game/dto.js";
@@ -107,6 +108,8 @@ export class GameState extends PIXI.EventEmitter implements IState {
     territory: Partial<Record<publicID, Set<string>>>;
     actAction: ActiveAction;
     votedEnd: boolean;
+    clearTurnTimer: (() => void) | null;
+    clearActionTimer: (() => void) | null;
   } = {
     myTurn: false,
     timeLeft: 0,
@@ -116,6 +119,8 @@ export class GameState extends PIXI.EventEmitter implements IState {
     territory: {},
     actAction: ActiveAction.None,
     votedEnd: false,
+    clearActionTimer: null,
+    clearTurnTimer: null,
   };
 
   mainUI: {
@@ -125,6 +130,8 @@ export class GameState extends PIXI.EventEmitter implements IState {
     selCard: UICard | null;
     selUnit: UIUnit | null;
     selTileCard: UICard | null;
+    turnTimer: PIXI.Text | null;
+    actionTimer: PIXI.Text | null;
   } = {
     tiles: [],
     selTile: null,
@@ -132,6 +139,8 @@ export class GameState extends PIXI.EventEmitter implements IState {
     selCard: null,
     selUnit: null,
     selTileCard: null,
+    turnTimer: null,
+    actionTimer: null,
   };
 
   handUI: {
@@ -243,6 +252,34 @@ export class GameState extends PIXI.EventEmitter implements IState {
       .rect(1, 1, tdp_BoxWidth - 1, tdp_HeaderHeight - 1)
       .stroke({ color: 0xffffff, width: 1 });
     this.hud.addChild(this.mainUI.playerHighlight);
+
+    this.mainUI.turnTimer = new PIXI.Text({
+      text: "0",
+      style: {
+        fill: 0xffffff,
+        fontSize: 15,
+        fontWeight: "bold",
+        fontFamily: "Courier",
+      },
+    });
+    this.mainUI.actionTimer = new PIXI.Text({
+      text: "0",
+      style: {
+        fill: 0xffffff,
+        fontSize: 15,
+        fontWeight: "bold",
+        fontFamily: "Courier",
+      },
+    });
+
+    this.mainUI.turnTimer.visible = false;
+    this.mainUI.actionTimer.visible = false;
+    this.hud.addChild(this.mainUI.turnTimer, this.mainUI.actionTimer);
+    this.mainUI.turnTimer.x = BOARD_WIDTH + HUD_WIDTH - 60;
+    this.mainUI.turnTimer.y = HUD_HEIGHT - 20;
+
+    this.mainUI.actionTimer.x = BOARD_WIDTH + HUD_WIDTH - 120;
+    this.mainUI.actionTimer.y = HUD_HEIGHT - 20;
   }
 
   onTileClicked(tile: BoardTile) {
@@ -398,8 +435,32 @@ export class GameState extends PIXI.EventEmitter implements IState {
       this.mainUI.playerHighlight.tint = this.model.players[actIndex].colour ?? HUD_HIGHLIGHT;
     }
 
+    if (this.model.clearActionTimer) {
+      this.model.clearActionTimer();
+    }
+    this.model.clearActionTimer = createCountdown(
+      (TURN_TIMER_ACTION_SECONDS - 1) * 1000,
+      this.displayActionTimer,
+    );
+
+    if (this.model.clearTurnTimer) {
+      this.model.clearTurnTimer();
+    }
+    this.model.clearTurnTimer = createCountdown(duration - 1000, this.displayTurnTimer);
     this.updateButtonState();
   }
+
+  displayActionTimer = (s: string): void => {
+    if (this.mainUI.actionTimer) {
+      this.mainUI.actionTimer.text = s;
+    }
+  };
+
+  displayTurnTimer = (s: string): void => {
+    if (this.mainUI.turnTimer) {
+      this.mainUI.turnTimer.text = s;
+    }
+  };
 
   initializeGame(playerDTOs: playerDTO[], selfDTO: selfDTO, riverCards: cardID[]) {
     this.model.players = playerDTOs;
@@ -412,6 +473,12 @@ export class GameState extends PIXI.EventEmitter implements IState {
     const initialTile = this.mainUI.tiles[0]?.[0];
     if (initialTile) {
       this.onTileClicked(initialTile);
+    }
+    if (this.mainUI.actionTimer) {
+      this.mainUI.actionTimer.visible = true;
+    }
+    if (this.mainUI.turnTimer) {
+      this.mainUI.turnTimer.visible = true;
     }
   }
 
@@ -657,7 +724,11 @@ export class GameState extends PIXI.EventEmitter implements IState {
   updatePlayerHeader(selID: number) {
     const selPlayer = this.model.players[selID];
 
-    const values = [selPlayer.handSize ?? 0, selPlayer.territory ?? 0, selPlayer.coins ?? 0];
+    const values = [
+      selPlayer.handSize ?? 0,
+      selPlayer.territory ?? 0,
+      Math.floor(selPlayer.coins / 1000) ?? 0,
+    ];
 
     values.forEach((val, i) => {
       this.tileUI.stats[selPlayer.id][i].text = String(val);
@@ -752,4 +823,32 @@ export class GameState extends PIXI.EventEmitter implements IState {
 
 function boardToWorld(x: number, y: number): [number, number] {
   return [x * (BOARD_WIDTH / BOARD_SIZE), y * (BOARD_HEIGHT / BOARD_SIZE)];
+}
+
+function createCountdown(durationMs: number, onTick: (x: string) => void) {
+  const endTime = Date.now() + durationMs;
+
+  let lastSeconds = -1;
+
+  const interval = setInterval(() => {
+    const msLeft = endTime - Date.now();
+
+    if (msLeft <= 0) {
+      clearInterval(interval);
+      onTick("0:00");
+      return;
+    }
+
+    const secondsLeft = Math.floor(msLeft / 1000);
+    if (secondsLeft !== lastSeconds) {
+      lastSeconds = secondsLeft;
+
+      const m = Math.floor(secondsLeft / 60);
+      const s = secondsLeft % 60;
+
+      onTick(`${m}:${s.toString().padStart(2, "0")}`);
+    }
+  }, 100); // small refresh rate for good accuracy
+
+  return () => clearInterval(interval);
 }
