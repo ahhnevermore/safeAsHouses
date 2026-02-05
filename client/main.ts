@@ -34,6 +34,23 @@ async function ensureSession(): Promise<void> {
 
   document.body.appendChild(app.canvas);
 
+  function resize() {
+    const scale = Math.min(
+      window.innerWidth / DESIGN_WIDTH,
+      window.innerHeight / DESIGN_HEIGHT
+    );
+    app.stage.scale.set(scale);
+    app.renderer.resize(
+      DESIGN_WIDTH * scale,
+      DESIGN_HEIGHT * scale
+    );
+    app.stage.x = (app.renderer.width - DESIGN_WIDTH *scale) / 2;
+    app.stage.y = (app.renderer.height - DESIGN_HEIGHT * scale) / 2;
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  
   await loadAssets();
 
   await ensureSession();
