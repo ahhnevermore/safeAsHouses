@@ -11,7 +11,7 @@ export const RIVERS: tileID[] = ["4,4" as tileID];
 export const BASES: tileID[] = ["0,0", "8,0", "0,8", "8,8"] as tileID[];
 export const REG_HAND_SIZE: number = 5;
 export const TILE_CARD_LIMIT: number = 5;
-export const TILE_UNIT_LIMIT: number = 5;
+export const TILE_UNIT_LIMIT: number = 4;
 
 export const RIVER_TYPE = "river";
 export const BASE_TYPE = "base";
@@ -155,7 +155,6 @@ export function isRiver(s: Structure | undefined | null): s is River {
 export function isBase(s: Structure | undefined | null): s is Base {
   return !!s && s.type === BASE_TYPE;
 }
-
 
 export const TURN_TIMER_MAIN_SECONDS = 300; // 5 minutes
 export const TURN_TIMER_ACTION_SECONDS = 30; // 30 seconds

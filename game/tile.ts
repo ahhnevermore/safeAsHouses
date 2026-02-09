@@ -1,4 +1,4 @@
-import { coins, ID, unitID, cardID } from "./types.js";
+import { coins, ID, unitID, cardID, Result } from "./types.js";
 import { Unit } from "./unit.js";
 import {
   Card,
@@ -20,16 +20,16 @@ export class Tile {
 
   constructor() {}
 
-  canAddUnit(playerID: ID, faceup: boolean): boolean {
+  canAddUnit(playerID: ID, faceup: boolean): Result<boolean> {
     const units = this.units[playerID];
     if (units) {
       if (faceup) {
-        return units.filter((u) => u.faceup).length < TILE_UNIT_LIMIT;
+        return { ok: true, val: units.filter((u) => u.faceup).length < TILE_UNIT_LIMIT };
       } else {
-        return units.filter((u) => !u.faceup).length < TILE_CARD_LIMIT;
+        return { ok: true, val: units.filter((u) => !u.faceup).length < TILE_CARD_LIMIT };
       }
     }
-    return false;
+    return { ok: false, error: "units array invalid`" };
   }
 
   raise(playerID: ID, bet: coins) {
@@ -42,41 +42,43 @@ export class Tile {
     }
   }
 
-  placeUnit(
-    unit: Unit,
-    playerID: ID,
-  ): [success: boolean, territoryCaptured: boolean, unitSwallowed: boolean, unitID: unitID] {
-    var territoryCaptured = false;
-    var success = false;
-    var unitSwallowed = false;
-    var unitID = unit.id;
-    if (this.owner != playerID && this.noCards()) {
-      territoryCaptured = true;
-    }
-    if (this.units[playerID] != null) {
-      //solitaire play
-      if (this.onlyOnePlayerCards(playerID)) {
-        const faceupCard = this.units[playerID].filter((unit) => unit.faceup)[0];
-        if (faceupCard) {
-          //this case is for handling placing a card onto only one faceup unit
-          const topCard = unit.stack[0];
-          if (topCard) {
-            faceupCard.addToStack(topCard);
-            success = true;
-            unitSwallowed = true;
-            unitID = faceupCard.id;
-          }
-        }
-        //combat situation
-      } else {
-        this.units[playerID].push(unit);
-        success = true;
+  placeCard(cardVal: cardID, playerID: ID): Result<{ territoryCaptured: boolean; unit: Unit }> {
+    if (this.canAddUnit(playerID, false)) {
+      let card = Card.fromKey(cardVal);
+      let territoryCaptured = false;
+      let unit = new Unit(card);
+      if (this.owner !== playerID && this.noCards()) {
+        territoryCaptured = true;
       }
-    } else {
-      this.units[playerID] = [unit];
+      const playerUnits = this.units[playerID];
+      if (playerUnits) {
+        // Player already has units on this tile.
+        if (this.onlyOnePlayerCards(playerID)) {
+          // Solitaire play: adding a card to an existing face-up unit.
+          const faceupUnit = playerUnits.find((u) => u.faceup);
+          if (faceupUnit) {
+            faceupUnit.addToStack(card);
+            unit = faceupUnit;
+          } else {
+            return {
+              ok: false,
+              error: "Solitaire play failed: no face-up unit or no card to add.",
+            };
+          }
+        } else {
+          // Standard placement in a contested tile.
+          playerUnits.push(unit);
+        }
+      } else {
+        // First unit for this player on this tile.
+        this.units[playerID] = [unit];
+      }
+      return { ok: true, val: { territoryCaptured, unit } };
     }
-
-    return [success, territoryCaptured, unitSwallowed, unitID];
+    return {
+      ok: false,
+      error: "unit cannot be added - TILE CARD LIMIT",
+    };
   }
 
   noCards(): boolean {

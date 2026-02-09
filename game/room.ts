@@ -20,7 +20,7 @@ import { Server as IOServer, Socket as IOSocket } from "socket.io";
 import { EventEmitter } from "events";
 import { Logger } from "winston";
 import { Unit } from "./unit.js";
-import { cardID, coins, ID, publicID, roomID, tileID, unitID } from "./types.js";
+import { cardID, coins, ID, publicID, Result, roomID, tileID, unitID } from "./types.js";
 import { playerDTO } from "./dto.js";
 import { TimerManager } from "../server/timer.js";
 
@@ -241,38 +241,39 @@ export class Room extends EventEmitter {
     return this.round > 0;
   }
 
-  placeCard(tileID: tileID, cardVal: cardID, id: ID): boolean {
+  placeCard(tileID: tileID, cardVal: cardID, id: ID): Result<boolean> {
     const currPlayer = this.getCurrPlayer();
-    if (currPlayer && currPlayer.id == id && currPlayer.hasCard(cardVal)) {
-      const card = Card.fromKey(cardVal);
-      const unit = new Unit(card);
-      let [success, unitSwallowed, unitID] = this.board.placeCard(tileID, unit, id);
-      if (success) {
-        currPlayer.discard(cardVal);
-        this.deck.addDiscard(Card.fromKey(cardVal));
-        if (unitSwallowed) {
-          this.sendOtherPlayers(
-            id,
-            "placeCardPublic",
-            currPlayer.publicID,
-            tileID,
+    if (!currPlayer || currPlayer.id != id) {
+      this.sendPlayer(id as ID, "placeCardRej", tileID, cardVal);
+      return {
+        ok: false,
+        error: `room.placeCard:not current player-currPlayer ${currPlayer?.id} player ${id} `,
+      };
+    }
 
-            {
-              unitID: unitID,
-              cardID: cardVal,
-            },
-          );
-        } else {
-          this.sendOtherPlayers(id as ID, "placeCardPublic", currPlayer.publicID, tileID, {
-            unitID: unitID,
-          });
-        }
-        this.sendPlayer(id as ID, "placeCardAck", tileID, cardVal, unitID, unitSwallowed);
-        return true;
+    if (!currPlayer.hasCard(cardVal)) {
+      this.sendPlayer(id as ID, "placeCardRej", tileID, cardVal);
+      return { ok: false, error: "room.placeCard: not owning card" };
+    }
+
+    let res = this.board.placeCard(tileID, cardVal, id);
+    if (res.ok) {
+      currPlayer.discard(cardVal);
+      this.deck.addDiscard(Card.fromKey(cardVal));
+      let unit = res.val.unit;
+      let serUnit = unit.toJSON();
+      if (unit.faceup) {
+        this.sendOtherPlayers(id, "placeCardPublic", currPlayer.publicID, tileID, serUnit);
+      } else {
+        this.sendOtherPlayers(id as ID, "placeCardPublic", currPlayer.publicID, tileID, {
+          unitID: res.val.unit.id,
+        });
       }
+      this.sendPlayer(id as ID, "placeCardAck", tileID, cardVal, serUnit);
+      return { ok: true, val: true };
     }
     this.sendPlayer(id as ID, "placeCardRej", tileID, cardVal);
-    return false;
+    return { ok: false, error: res.error };
   }
 
   /*

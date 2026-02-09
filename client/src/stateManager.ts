@@ -125,6 +125,10 @@ export class StateManager {
         this.changeState(ClientState.MainMenu);
       }
 
+      socket.on("placeCardAck", (tileId, cardID, serUnit) => {
+        this.game.placeCardAck(tileId, cardID, serUnit);
+      });
+
       // Now, display the appropriate notification on the main menu.
       if (reason === "io server disconnect") {
         // This is a graceful shutdown initiated by the server (e.g., for an update).

@@ -344,12 +344,17 @@ async function startWorker() {
       socket.on(
         "placeCard",
         withRoom(async (room, tileID, cardID) => {
-          if (room.isPlayerTurn(socket.data.userId)) {
-            const cardPlacedSuccessfully = room.placeCard(socket.data.userId, cardID, tileID);
-            if (cardPlacedSuccessfully) {
-              const serializedState = serializeRoomState(room);
-              await timerManager.saveRoomBumpAction(room.id, serializedState);
-            }
+          const res = room.placeCard(tileID, cardID, socket.data.userId);
+          if (res.ok) {
+            const serializedState = serializeRoomState(room);
+            await timerManager.saveRoomBumpAction(room.id, serializedState);
+            logger.info(
+              `room ${room.id}- user ${socket.data.userId} placecard ${cardID} on tile ${tileID} `,
+            );
+          } else {
+            logger.warn(
+              `room ${room.id}- user ${socket.data.userId} FAILED PLACECARD ${cardID} on tile ${tileID} with reason: ${res.error}`,
+            );
           }
         }),
       );

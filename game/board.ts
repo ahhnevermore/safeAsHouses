@@ -16,7 +16,7 @@ import {
   BASES,
   isRiver,
 } from "./util.js";
-import { coins, ID, tileID, unitID } from "./types.js";
+import { cardID, coins, ID, Result, tileID, unitID } from "./types.js";
 
 export class Board {
   grid: Tile[][] = Array.from({ length: BOARD_SIZE }, () =>
@@ -49,25 +49,26 @@ export class Board {
     return tile;
   }
 
-  placeCard(
-    tileID: tileID,
-    unit: Unit,
-    playerID: ID,
-  ): [success: boolean, unitSwallowed: boolean, unitID: unitID] {
+  placeCard(tileID: tileID, cardVal: cardID, playerID: ID): Result<{ unit: Unit }> {
     const xy = Vec2.fromKey(tileID);
     if (this.isValidPlacement(xy, playerID)) {
       const tile = this.getTile(xy.x, xy.y)!;
-      if (tile.canAddUnit(playerID, false)) {
-        let [success, territoryCaptured, unitSwallowed, unitID] = tile.placeUnit(unit, playerID);
-        if (success) {
-          if (territoryCaptured) {
+      const res = tile.placeCard(cardVal, playerID);
+      if (res.ok) {
+        {
+          if (res.val.territoryCaptured) {
             this.capture(playerID, xy);
           }
-          return [success, unitSwallowed, unitID];
+          return {
+            ok: true,
+            val: { unit: res.val.unit },
+          };
         }
+      } else {
+        return res;
       }
     }
-    return [false, false, 0 as unitID];
+    return { ok: false, error: "invalid placement of card" };
   }
 
   moveUnit(orig: Vec2, dest: Vec2, playerID: ID, unitID: unitID): boolean {

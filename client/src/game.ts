@@ -24,7 +24,7 @@ import { ASSETS } from "./loader.js";
 import { BoardTile, Layer } from "./boardTile.js";
 import { UIButton } from "./uibutton.js";
 import { UICard } from "./uicard.js";
-import { cardID, coins, colour, publicID, roomID } from "../../game/types.js";
+import { cardID, coins, colour, publicID, roomID, tileID, unitID } from "../../game/types.js";
 import { UIUnit } from "./uiunit.js";
 
 enum ActiveAction {
@@ -229,7 +229,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       colour: SUBMIT_BTN,
     });
     this.buttons.submit.position.set(BOARD_WIDTH + HUD_WIDTH - 2 * BTN_WIDTH, 0);
-    this.buttons.submit.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.submit.on("clicked", (btn: UIButton) => this.submitBtnClicked(btn));
 
     this.buttons.roundEnd = new UIButton({
       btnName: BtnName.roundEnd,
@@ -237,7 +237,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       colour: END_TURN_BTN,
     });
     this.buttons.roundEnd.position.set(BOARD_WIDTH + HUD_WIDTH - BTN_WIDTH, 0);
-    this.buttons.roundEnd.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.roundEnd.on("clicked", (btn: UIButton) => {});
     this.hud.addChild(this.buttons.submit, this.buttons.roundEnd);
 
     this.tileDisplayContainer = new PIXI.Container();
@@ -294,7 +294,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       }
     }
   }
-  updateButtonState(clickedButton?: UIButton) {
+  updateButtonState(clickedButton?: BtnName) {
     if (!this.model.myTurn) {
       Object.values(this.buttons).forEach((btn) => {
         if (btn) {
@@ -305,16 +305,8 @@ export class GameState extends PIXI.EventEmitter implements IState {
     }
 
     if (clickedButton) {
-      // Logic for emitting events based on which button was clicked
-      switch (clickedButton.name) {
-        case BtnName.submit:
-          this.emit(GSig.Submit);
-          break;
-        // TODO: Add cases for other buttons like flip, placeCard, etc.
-      }
-
       Object.values(this.buttons)
-        .filter((btn) => btn && btn.name != clickedButton.name)
+        .filter((btn) => btn && btn.name != clickedButton)
         .forEach((btn) => {
           if (btn) {
             btn.setEnabled(false);
@@ -538,19 +530,19 @@ export class GameState extends PIXI.EventEmitter implements IState {
 
     this.buttons.move = new UIButton({ btnName: BtnName.move, text: "Move", colour: MOVE_BTN });
     this.buttons.move.position.set(0, 480);
-    this.buttons.move.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.move.on("clicked", (btn: UIButton) => {});
 
     this.buttons.flip = new UIButton({ btnName: BtnName.flip, text: "Flip", colour: FLIP_BTN });
     this.buttons.flip.position.set(BTN_WIDTH, 480);
-    this.buttons.flip.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.flip.on("clicked", (btn: UIButton) => {});
 
     this.buttons.call = new UIButton({ btnName: BtnName.call, text: "Call", colour: CALL_BTN });
     this.buttons.call.position.set(2 * BTN_WIDTH, 480);
-    this.buttons.call.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.call.on("clicked", (btn: UIButton) => {});
 
     this.buttons.raise = new UIButton({ btnName: BtnName.raise, text: "Raise", colour: RAISE_BTN });
     this.buttons.raise.position.set(3 * BTN_WIDTH, 480);
-    this.buttons.raise.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.raise.on("clicked", (btn: UIButton) => {});
 
     this.buttons.allIn = new UIButton({
       btnName: BtnName.allIn,
@@ -558,7 +550,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       colour: ALL_IN_BTN,
     });
     this.buttons.allIn.position.set(HUD_WIDTH - BTN_WIDTH, 480);
-    this.buttons.allIn.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.allIn.on("clicked", (btn: UIButton) => {});
 
     this.tileUI.actTile = new PIXI.Text({
       text: "0,0",
@@ -757,7 +749,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
     const cardY = HUD_HEIGHT - hdp_MarginY - BTN_HEIGHT;
     this.buttons.buy = new UIButton({ btnName: BtnName.buy, text: "Buy Card", colour: BUY_BTN });
     this.buttons.buy.position.set(BTN_WIDTH, cardY);
-    this.buttons.buy.on("clicked", (btn: UIButton) => this.updateButtonState(btn));
+    this.buttons.buy.on("clicked", (btn: UIButton) => {});
 
     this.buttons.add = new UIButton({
       btnName: BtnName.add,
@@ -765,7 +757,7 @@ export class GameState extends PIXI.EventEmitter implements IState {
       colour: ADD_TILE_BTN,
     });
     this.buttons.add.position.set(0, cardY);
-    this.buttons.add.on("clicked", (btn: UIButton) => this.addButtonClicked(btn));
+    this.buttons.add.on("clicked", (btn: UIButton) => this.addBtnClicked(btn));
 
     this.handDisplayContainer.addChild(this.buttons.buy, this.buttons.add);
 
@@ -812,13 +804,18 @@ export class GameState extends PIXI.EventEmitter implements IState {
     return false;
   }
 
-  addButtonClicked(btn: UIButton) {
-    this.updateButtonState(btn);
+  addBtnClicked(btn: UIButton) {
+    this.updateButtonState(btn.name);
     const idx = this.handUI.cards.findIndex((card) => card == this.mainUI.selCard);
     if (this.model.self && this.model.self.hand.length > idx && this.mainUI.selTile) {
       this.emit(GSig.Add, this.model.self.hand[idx], this.mainUI.selTile.toKey());
     }
   }
+
+  submitBtnClicked(btn: UIButton) {
+    this.emit(GSig.Submit);
+  }
+  placeCardAck(tileId: tileID, cardID: cardID, serUnit: string) {}
 }
 
 function boardToWorld(x: number, y: number): [number, number] {
