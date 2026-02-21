@@ -32,7 +32,7 @@ notify-keyspace-events Ex
 
 1. Clone the repo:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/ahhnevermore/safeashouses
    ```
 2. Install NPM packages:
    ```bash
